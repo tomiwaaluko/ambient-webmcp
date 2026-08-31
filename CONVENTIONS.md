@@ -4,6 +4,8 @@ This repo is built by several agents across several harnesses over three days. T
 
 Judges may read this source. Coherence is part of the submission.
 
+> **Working a ticket?** Read [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) too — it carries the work graph, file ownership (who else is editing what, right now), the checkpoint/cut triggers, and the standing constraints that bind every ticket. If `docs/spike-report.md` or `docs/skeleton-report.md` exist, read those before writing code: they carry corrections to assumptions this file was written under.
+
 ---
 
 ## Hard constraints
