@@ -6,11 +6,20 @@
 <title>Ambient — host</title>
 
 <!-- ORIGIN TRIAL TOKEN GOES HERE. Owned by PRO-5 (U1).
-     Mint a first-party token for THIS origin's exact hostname (see below).
-     Iframes do NOT inherit the embedder's token — each of the four origins
-     needs its own. vercel.app is on the Public Suffix List, so a
-     subdomain-matched token will not be issued; these are four separate tokens.
+
+     Mint a FIRST-PARTY token for exactly this origin:
+       https://ambient-host-tomiwaalukos-projects.vercel.app
+
+     NOT ambient-host.vercel.app — that name was taken globally and does not
+     resolve to this project. Tokens bind to exact hostnames.
+
+     Iframes do NOT inherit the embedder's token, and vercel.app is on the
+     Public Suffix List so no subdomain-matched token is issued. Four origins,
+     four separate tokens.
+
      Trial: WebMCP, id 4163014905550602241, milestones 149-156.
+     Validity must extend past the judging window (after 2026-09-03).
+
 <meta http-equiv="origin-trial" content="PASTE_TOKEN_FOR_THIS_ORIGIN">
 -->
 

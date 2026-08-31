@@ -30,6 +30,25 @@ Do not merge your own PR.
 
 ---
 
+## Deployed origins — canonical
+
+**These are the real hostnames. Use them verbatim** in the allowlist, in `exposedTo`, in `fromOrigins`, in origin trial tokens, and in anything shown to a judge. Anywhere else that names an origin is stale by definition; this table wins.
+
+All four Vercel projects are live and serving production from `main` (root directory per project, auto-deploy on push). Vercel team `tomiwaalukos-projects`, hobby plan.
+
+| Role | Origin | Vercel project | Root dir | Token |
+|---|---|---|---|---|
+| host | `https://ambient-host-tomiwaalukos-projects.vercel.app` | `ambient-host` | `sites/host` | ☐ not minted |
+| acme | `https://acme-booking-tomiwaalukos-projects.vercel.app` | `acme-booking` | `sites/acme-booking` | ☐ not minted |
+| northwind | `https://northwind-checkout-tomiwaalukos-projects.vercel.app` | `northwind-checkout` | `sites/northwind-checkout` | ☐ not minted |
+| zenith | `https://zenith-support-tomiwaalukos-projects.vercel.app` | `zenith-support` | `sites/zenith-support` | ☐ not minted |
+
+⚠️ **The short `<name>.vercel.app` form does not work for three of the four.** Those names were already taken globally, so Vercel assigned arbitrary suffixes (`-theta`, `-xi`, `-six`) — inconsistent, and only `northwind-checkout.vercel.app` got the clean form. The team-suffixed form above is the one that exists for all four, so it is canonical. Do not use the short form anywhere.
+
+**Tokens.** Four separate **first-party** tokens, one per origin, delivered by `<meta http-equiv="origin-trial">` in that origin's own document. Iframes do not inherit the embedder's token, and `vercel.app` is on the Public Suffix List so a subdomain-matched token will not be issued. Trial `WebMCP`, id `4163014905550602241`, milestones 149–156. Self-service, immediate, no review queue. **Validity must extend past the judging window, which is after 2026-09-03.** Each `sites/*/index.html` has a commented placeholder marking where its token goes.
+
+A separate **third-party** token also goes in the widget helper (PRO-7) — that one must be delivered from an external JS file, not a meta tag, and is what carries WebMCP onto any host embedding the widget.
+
 ## The graph
 
 ```mermaid

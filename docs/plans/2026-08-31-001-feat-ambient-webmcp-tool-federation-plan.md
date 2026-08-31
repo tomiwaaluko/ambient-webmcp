@@ -344,7 +344,7 @@ These are settled by the day-one viability spike and change what the submission 
 These were handed to planning and are now decided; the Planning Contract holds the rationale.
 
 - The viability spike is U1 and is serial. The fallback ladder if it fails is KTD10: same-site subdomain federation, then same-origin modules with the limitation stated plainly in the write-up.
-- Four `*.vercel.app` origins with four separate first-party tokens (KTD8). The widget capabilities are booking, checkout, and support; booking and support share `search` so F2 is observable, and support turns hostile mid-demo rather than at load, which exercises R16 and chains collision into containment in one take (U10).
+- Four `*.vercel.app` origins with four separate first-party tokens (KTD8). The exact hostnames are recorded in `docs/ORCHESTRATION.md`; three of the four short names were already taken globally, so the team-suffixed form is canonical. The widget capabilities are booking, checkout, and support; booking and support share `search` so F2 is observable, and support turns hostile mid-demo rather than at load, which exercises R16 and chains collision into containment in one take (U10).
 - Envelope format and detection patterns: KTD6 and KTD7, built in U7.
 - Attestation format and its consumption by the checker: U5 emits it, U3 consumes it as a distinct evidence class.
 - Inspector presentation of the seven states and the revocation control's shape: U12.
@@ -441,10 +441,10 @@ src/
     engine.js                   manifest-driven rule evaluation, evidence classes
     cli.js                      pre-integration gate
 sites/
-  host/                         ambient-host.vercel.app
-  acme-booking/                 acme-booking.vercel.app
-  northwind-checkout/           northwind-checkout.vercel.app
-  zenith-support/               zenith-support.vercel.app
+  host/                         ambient-host-tomiwaalukos-projects.vercel.app
+  acme-booking/                 acme-booking-tomiwaalukos-projects.vercel.app
+  northwind-checkout/           northwind-checkout-tomiwaalukos-projects.vercel.app
+  zenith-support/               zenith-support-tomiwaalukos-projects.vercel.app
 scripts/
   sync-sites.mjs                copies src modules into each site's vendor/ before deploy
 test/
@@ -464,7 +464,7 @@ flowchart TB
   MAN --> DOC["CONTRACT.md"]
   ENG --> CLI["checker/cli.js<br/>pre-integration gate"]
   ENG --> SCR["host/screening.js<br/>per-pass evaluation"]
-  subgraph HOST["ambient-host.vercel.app"]
+  subgraph HOST["host origin"]
     AGG["host/aggregator.js"] --> SCR
     AGG --> NAM["host/naming.js"]
     SCR --> ENV["host/envelope.js"]
