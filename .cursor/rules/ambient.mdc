@@ -1,0 +1,21 @@
+---
+description: Ambient project entry point - routes to conventions, work graph, and plan
+alwaysApply: true
+---
+
+# Ambient — read AGENTS.md first
+
+Read **`AGENTS.md`** at the repo root before writing any code. It routes you to:
+
+- `CONVENTIONS.md` — module style, reason codes, and the cross-module interface signatures other tickets build against
+- `docs/ORCHESTRATION.md` — the work graph, file ownership, checkpoints and cut triggers
+- `docs/plans/2026-08-31-001-feat-ambient-webmcp-tool-federation-plan.md` — the authority on what to build (scan headings, do not read whole)
+
+## Non-negotiable
+
+1. **No build step, no dependencies, no framework extraction.** Hand-authored ES modules served static; tests use `node --test`.
+2. **Never overclaim.** Ambient does not prevent prompt injection, does not do generic false-read-only detection, and cannot cancel an in-flight side effect. Binds identifiers and comments, not just prose.
+3. **Never fail silently.** Distinct reason code per cause; never truncate silently.
+4. **The plan wins** over a ticket that contradicts it — surface the conflict rather than guessing.
+5. **Do not merge your own PR.** Self-review the diff, run `node --test test/`, paste output into the PR.
+6. **Check the file-ownership table** in `docs/ORCHESTRATION.md` before editing — other agents are working in parallel.
