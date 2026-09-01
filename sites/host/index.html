@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ambient — host</title>
+<title>Ambient — host demo</title>
 
 <!-- Origin trial token for this exact origin:
      https://ambient-host-tomiwaalukos-projects.vercel.app
@@ -15,100 +15,165 @@
 
 <style>
   :root { color-scheme: light dark; }
-  body { font: 15px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 2rem auto; padding: 0 1.5rem; }
-  code { font-family: ui-monospace, monospace; }
-  .role { color: color-mix(in srgb, currentColor 60%, transparent); }
-  iframe { width: 100%; height: 140px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-           border-radius: 6px; margin: .5rem 0; }
-  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .75rem; border-radius: 6px;
-        overflow-x: auto; font-size: 12px; }
-  .inspector-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 1rem 0; }
-  .inspector-table th, .inspector-table td { border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-    padding: .4rem .6rem; text-align: left; vertical-align: top; }
-  button { font: inherit; padding: .35rem .75rem; cursor: pointer; }
+  body {
+    font: 15px/1.5 system-ui, sans-serif;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 .25rem; }
+  .intro { color: color-mix(in srgb, currentColor 65%, transparent); margin: 0 0 1.5rem; }
+  section { margin: 0 0 2rem; }
+  section h2 { font-size: 1rem; font-weight: 600; margin: 0 0 .5rem; text-transform: uppercase; letter-spacing: .04em; }
+  code { font-family: ui-monospace, monospace; font-size: .92em; }
+
+  /* R45 tier 1 — outcome is the primary surface */
+  #outcome {
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    min-height: 8rem;
+    background: color-mix(in srgb, Canvas 92%, Highlight 8%);
+  }
+  #outcome h2 {
+    font-size: 1.5rem;
+    text-transform: none;
+    letter-spacing: normal;
+    margin: 0 0 .35rem;
+  }
+  .outcome-lead { margin: 0 0 1rem; max-width: 40rem; }
+  .outcome-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+  .outcome-card {
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    background: Canvas;
+  }
+  .outcome-card h3 { margin: 0 0 .5rem; font-size: .95rem; }
+  .outcome-list { margin: 0; padding-left: 1.2rem; }
+  .outcome-error { color: #b00020; margin: 0; }
+  #outcome button {
+    font: inherit;
+    padding: .5rem 1rem;
+    cursor: pointer;
+  }
+
+  /* R45 tier 2 — tools with provenance */
+  #tools-panel h2 { font-size: .85rem; }
+  .tool-provenance-list { list-style: none; margin: 0; padding: 0; }
+  .tool-provenance-list li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+    align-items: baseline;
+    padding: .35rem 0;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  }
+  .tool-origin {
+    font-size: .82rem;
+    color: color-mix(in srgb, currentColor 55%, transparent);
+    word-break: break-all;
+  }
+  .tools-empty { color: color-mix(in srgb, currentColor 55%, transparent); margin: 0; }
+
+  /* R45 tier 3 — diagnostics */
+  #diagnostics h2 { font-size: .85rem; color: color-mix(in srgb, currentColor 55%, transparent); }
+  .inspector-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .inspector-table th, .inspector-table td {
+    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    padding: .35rem .5rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  /* Widget embeds — present but not the story */
+  #widgets { margin-top: 2.5rem; }
+  #widgets summary { cursor: pointer; color: color-mix(in srgb, currentColor 60%, transparent); }
+  iframe {
+    width: 100%;
+    height: 120px;
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    border-radius: 6px;
+    margin: .5rem 0;
+  }
+
+  #unsupported {
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+  }
+
+  .gate2 {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+    font-size: 13px;
+    color: color-mix(in srgb, currentColor 60%, transparent);
+  }
+  .gate2 pre {
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    padding: .65rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 11px;
+  }
+  .gate2 button { font: inherit; font-size: 13px; padding: .25rem .6rem; cursor: pointer; }
 </style>
 </head>
 <body>
-  <h1>Ambient — host</h1>
-  <p class="role">Host aggregator (PRO-8). Gate 2 console path preserved.</p>
+  <header>
+    <h1>Ambient</h1>
+    <p class="intro">Paste script tags on a plain page — three vendor widgets federate into one agent-operable surface.</p>
+  </header>
 
-  <h2>Embedded widget</h2>
-  <div id="frames"></div>
+  <section id="unsupported" hidden>
+    <h2>WebMCP required</h2>
+    <p>
+      This demo needs <strong>Google Chrome</strong> with the <strong>WebMCP origin trial</strong> active for
+      <code>https://ambient-host-tomiwaalukos-projects.vercel.app</code>.
+      Without <code>document.modelContext</code>, federated tools cannot register and this page cannot demonstrate adoption.
+    </p>
+    <p>No install step and no browser flag — the origin trial token in this document supplies trial access when Chrome accepts it.</p>
+  </section>
 
-  <h2>Inspector</h2>
-  <div id="inspector" aria-live="polite"></div>
+  <div id="demo" hidden>
+    <!-- R45 tier 1: completed task / outcome -->
+    <section id="outcome-region" aria-labelledby="outcome-heading">
+      <div id="outcome" aria-live="polite"></div>
+    </section>
 
-  <h2>Agent console</h2>
-  <p class="role">Call the namespaced proxy via <code>window.ambient.call('acme.booking.search', { query: '…' })</code>.</p>
-  <button type="button" id="demo-call">Demo: acme.booking.search</button>
-  <pre id="log">booting…</pre>
+    <!-- R45 tier 2: namespaced tools with contributing origin -->
+    <section id="tools-panel" aria-labelledby="tools-heading">
+      <h2 id="tools-heading">Governed tools</h2>
+      <div id="tool-list"></div>
+    </section>
+
+    <!-- R45 tier 3: federation diagnostics -->
+    <section id="diagnostics" aria-labelledby="diagnostics-heading">
+      <h2 id="diagnostics-heading">Federation diagnostics</h2>
+      <div id="inspector" aria-live="polite"></div>
+    </section>
+
+    <details id="widgets">
+      <summary>Embedded vendor widgets (three iframes)</summary>
+      <div id="frames"></div>
+    </details>
+
+    <div class="gate2">
+      <p>Gate 2 console path: <code>window.ambient.call('acme.booking.search', &#123; query: 'flights to lisbon' &#125;)</code></p>
+      <button type="button" id="gate2-call">Run Gate 2 call</button>
+      <pre id="gate2-log">—</pre>
+    </div>
+  </div>
 
 <script type="module">
-import { startAggregator, ALLOWLIST } from './host/aggregator.js';
-import { renderInspector } from './host/inspector.js';
-import { executeToolCompat } from './vendor/adapter.js';
-
-const ACME = 'https://acme-booking-tomiwaalukos-projects.vercel.app';
-const framesEl = document.getElementById('frames');
-const inspectorEl = document.getElementById('inspector');
-const logEl = document.getElementById('log');
-const lines = [];
-
-function log(...parts) {
-  const line = parts.map((p) => (typeof p === 'string' ? p : JSON.stringify(p, null, 2))).join(' ');
-  lines.push(line);
-  logEl.textContent = lines.slice(-20).join('\n');
-}
-
-function mountAcme() {
-  const frame = document.createElement('iframe');
-  frame.allow = `tools ${ACME}`;
-  frame.src = `${ACME}/`;
-  frame.title = 'Acme Booking widget';
-  framesEl.appendChild(frame);
-  return frame;
-}
-
-async function listHostTools() {
-  const tools = await document.modelContext.getTools();
-  return tools.map((t) => ({ name: t.name, origin: t.origin }));
-}
-
-async function callProxy(name, input) {
-  const tools = await document.modelContext.getTools();
-  const tool = tools.find((t) => t.name === name);
-  if (!tool) {
-    return { ok: false, code: 'PROXY_NOT_FOUND', message: `No tool named ${name} on the host surface.` };
-  }
-  return executeToolCompat(tool, input);
-}
-
-window.ambient = {
-  ALLOWLIST,
-  call: callProxy,
-  listTools: listHostTools
-};
-
-const frame = mountAcme();
-
-window.addEventListener('message', (event) => {
-  if (event.source !== frame.contentWindow) return;
-  const data = event.data;
-  if (!data || data.source !== 'ambient-skeleton-widget') return;
-  log(`widget ${data.type}${data.message ? `: ${data.message}` : ''}`);
-});
-
-startAggregator((snapshot) => {
-  renderInspector(inspectorEl, snapshot.origins);
-  log(`aggregated gen=${snapshot.generation}`, snapshot.origins, snapshot.errors);
-});
-
-document.getElementById('demo-call').addEventListener('click', async () => {
-  const outcome = await callProxy('acme.booking.search', { query: 'flights to lisbon' });
-  log('demo call', outcome);
-});
-
-log('host ready', { modelContext: typeof document.modelContext });
+import { bootDemo } from './demo.js';
+bootDemo();
 </script>
 </body>
 </html>
