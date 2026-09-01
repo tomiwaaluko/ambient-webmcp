@@ -199,7 +199,7 @@ async function registerProxyForTool(tool, entry, origin, manifest) {
     description: descriptionOutcome.text,
     inputSchema: envelopedSchema,
     annotations: buildProxyAnnotations(tool),
-    origin: globalThis.location?.origin ?? 'https://ambient-host-tomiwaalukos-projects.vercel.app',
+    origin,
     sourceAnnotations: tool.annotations ?? {}
   };
 
