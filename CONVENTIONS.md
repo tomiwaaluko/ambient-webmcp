@@ -28,6 +28,7 @@ Judges may read this source. Coherence is part of the submission.
 - **Never fail silently.** Every refusal carries a machine-readable reason code plus human-readable text. WebMCP's own failure mode is a silent empty list; Ambient exists partly to make failure legible, so a swallowed error here is a defect against the product's thesis.
 - **Never truncate silently.** Over-budget input is refused with a named cause, not quietly shortened.
 - Reason codes are `SCREAMING_SNAKE`: `INSTANCE_LIMIT_REACHED`, `NAME_TOO_LONG`, `NAME_ILLEGAL_CHARS`, `ORIGIN_NOT_ALLOWLISTED`, `BOUND_EXCEEDED_TOOL_COUNT`, `INJECTION_PATTERN_MATCH`, `EXECUTION_TIMEOUT`, `RESULT_AFTER_REVOCATION`.
+  - Added by `src/shared/adapter.js` (PRO-5): `TOOL_HANDLE_INVALID`, `MODEL_CONTEXT_UNAVAILABLE`, `INPUT_SHAPE_UNSUPPORTED`, `RESULT_PARSE_FAILED`.
 - Distinct causes get distinct codes. "Name rejected" is not good enough when the inspector must distinguish a length failure from an instance-limit failure.
 
 ## Language discipline
@@ -69,9 +70,19 @@ evaluate({ manifest, subject, harness })
 // src/widget/helper.js
 registerConformantTool({ widgetId, name, description, inputSchema, readOnly, untrustedContent, exposedTo, authorize, execute })
 // throws on any non-conformant shape. `authorize` required when readOnly is false.
+// ⚠️ `exposedTo` is a parameter of THIS helper, but it must NOT be forwarded into
+// the tool descriptor. The platform call is:
+//   await document.modelContext.registerTool(descriptor, { exposedTo: [...] })
+// Inside the descriptor it is an unrecognised dictionary member: silently dropped,
+// tool still registers, host sees nothing, no error on either side.
+// registerTool returns a Promise — an un-awaited call discards its own rejection,
+// including the NotAllowedError that is a widget's only Permissions Policy signal.
+// Both observed on Chrome 151; see docs/spike-report.md.
 
 // src/shared/adapter.js
 executeToolCompat(tool, input) // handles object-vs-JSON-string, caches winner
+// `tool` is a RegisteredTool handle from getTools(), not a name.
+// -> { ok: true, result, shape } | { ok: false, code, message }
 ```
 
 ## Testing
