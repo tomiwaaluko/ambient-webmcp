@@ -16,15 +16,86 @@
 
 <style>
   :root { color-scheme: light dark; }
-  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1.5rem; }
-  code { font-family: ui-monospace, monospace; }
-  .role { color: color-mix(in srgb, currentColor 60%, transparent); }
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 42rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  code { font-family: ui-monospace, monospace; font-size: .92em; }
+  .role { color: color-mix(in srgb, currentColor 62%, transparent); margin: .25rem 0 .75rem; }
+  .panel { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 6px; padding: .75rem; margin: .75rem 0; }
+  .panel h2 { font-size: .95rem; margin: 0 0 .5rem; }
+  ul { margin: .25rem 0; padding-left: 1.2rem; }
+  label { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
+  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .5rem; border-radius: 4px; overflow-x: auto; font-size: 12px; margin: .5rem 0 0; white-space: pre-wrap; }
 </style>
 </head>
 <body>
   <h1>Northwind Checkout</h1>
-  <p class="role">Widget vendor. Host-assigned label <code>northwind</code>. Conformant, instrumented.</p>
-  <p class="role">Tools: <code>quote</code>, <code>pay</code> (mutating). Mutating tools enforce authorization at execution time.</p>
-  <p>Scaffold only. <code>PRO-5</code> uses this for the spike; <code>PRO-14</code> builds the real widget.</p>
+  <p class="role">Widget vendor <code>northwind</code> · widget id <code>checkout</code> · tools <code>quote</code>, <code>pay</code>.</p>
+
+  <div class="panel">
+    <h2>Session authorization</h2>
+    <label><input type="checkbox" id="authorize"> Allow mutating <code>pay</code> calls this session</label>
+  </div>
+
+  <div class="panel">
+    <h2>Catalog (synthetic)</h2>
+    <ul id="catalog"></ul>
+  </div>
+
+  <div class="panel">
+    <h2>Orders</h2>
+    <ul id="orders"><li>None yet.</li></ul>
+  </div>
+
+  <pre id="status">booting…</pre>
+
+<script type="module">
+import {
+  bootWidget,
+  getCatalog,
+  getOrders,
+  setAuthorized
+} from './widget.js';
+
+const statusEl = document.getElementById('status');
+const catalogEl = document.getElementById('catalog');
+const ordersEl = document.getElementById('orders');
+const authorizeEl = document.getElementById('authorize');
+
+function renderCatalog() {
+  catalogEl.innerHTML = getCatalog()
+    .map((row) => `<li><code>${row.sku}</code> ${row.name} — $${row.unitPrice}</li>`)
+    .join('');
+}
+
+function renderOrders() {
+  const rows = getOrders();
+  ordersEl.innerHTML = rows.length
+    ? rows.map((row) => `<li><code>${row.orderId}</code> ${row.sku} × ${row.quantity} — $${row.total}</li>`).join('')
+    : '<li>None yet.</li>';
+}
+
+authorizeEl.addEventListener('change', () => {
+  setAuthorized(authorizeEl.checked);
+  statusEl.textContent = authorizeEl.checked
+    ? 'Session authorized for pay.'
+    : 'Session not authorized for pay.';
+});
+
+try {
+  await bootWidget({
+    onStatus(line) {
+      statusEl.textContent = line;
+      renderOrders();
+    }
+  });
+  renderCatalog();
+  renderOrders();
+  statusEl.textContent = 'Ready — quote (read-only) and pay (mutating, requires authorization).';
+  parent.postMessage({ source: 'ambient-widget', vendor: 'northwind', type: 'ready' }, '*');
+} catch (cause) {
+  statusEl.textContent = `registration failed: ${cause?.name ?? 'Error'}: ${cause?.message ?? cause}`;
+  parent.postMessage({ source: 'ambient-widget', vendor: 'northwind', type: 'error', message: String(cause?.message ?? cause) }, '*');
+}
+</script>
 </body>
 </html>

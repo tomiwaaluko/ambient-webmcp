@@ -15,54 +15,86 @@
 
 <style>
   :root { color-scheme: light dark; }
-  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; }
-  h1 { font-size: 1.1rem; margin: 0 0 .25rem; }
-  code { font-family: ui-monospace, monospace; }
-  .role { color: color-mix(in srgb, currentColor 60%, transparent); margin: .25rem 0; }
-  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .5rem; border-radius: 4px;
-        overflow-x: auto; font-size: 12px; margin: .5rem 0 0; }
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 42rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  code { font-family: ui-monospace, monospace; font-size: .92em; }
+  .role { color: color-mix(in srgb, currentColor 62%, transparent); margin: .25rem 0 .75rem; }
+  .panel { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 6px; padding: .75rem; margin: .75rem 0; }
+  .panel h2 { font-size: .95rem; margin: 0 0 .5rem; }
+  ul { margin: .25rem 0; padding-left: 1.2rem; }
+  label { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
+  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .5rem; border-radius: 4px; overflow-x: auto; font-size: 12px; margin: .5rem 0 0; white-space: pre-wrap; }
+  button { font: inherit; padding: .35rem .65rem; cursor: pointer; }
 </style>
 </head>
 <body>
   <h1>Acme Booking</h1>
-  <p class="role">Widget vendor. Host-assigned label <code>acme</code>, widget id <code>booking</code>.</p>
-  <p class="role"><strong>PRO-19 walking skeleton.</strong> One tool: <code>search</code>.</p>
+  <p class="role">Widget vendor <code>acme</code> · widget id <code>booking</code> · tools <code>search</code>, <code>book</code>.</p>
+
+  <div class="panel">
+    <h2>Session authorization</h2>
+    <label><input type="checkbox" id="authorize"> Allow mutating <code>book</code> calls this session</label>
+  </div>
+
+  <div class="panel">
+    <h2>Catalog (synthetic)</h2>
+    <ul id="catalog"></ul>
+  </div>
+
+  <div class="panel">
+    <h2>Reservations</h2>
+    <ul id="bookings"><li>None yet.</li></ul>
+  </div>
+
   <pre id="status">booting…</pre>
 
 <script type="module">
-import { registerConformantTool } from './vendor/helper.js';
+import {
+  bootWidget,
+  getBookings,
+  getCatalog,
+  setAuthorized
+} from './widget.js';
 
-const HOST = 'https://ambient-host-tomiwaalukos-projects.vercel.app';
 const statusEl = document.getElementById('status');
+const catalogEl = document.getElementById('catalog');
+const bookingsEl = document.getElementById('bookings');
+const authorizeEl = document.getElementById('authorize');
+
+function renderCatalog() {
+  catalogEl.innerHTML = getCatalog()
+    .map((row) => `<li><code>${row.id}</code> ${row.destination} · ${row.date} · ${row.seats} seat(s)</li>`)
+    .join('');
+}
+
+function renderBookings() {
+  const rows = getBookings();
+  bookingsEl.innerHTML = rows.length
+    ? rows.map((row) => `<li><code>${row.id}</code> ${row.destination} — ${row.guestName}</li>`).join('')
+    : '<li>None yet.</li>';
+}
+
+authorizeEl.addEventListener('change', () => {
+  setAuthorized(authorizeEl.checked);
+  statusEl.textContent = authorizeEl.checked
+    ? 'Session authorized for book.'
+    : 'Session not authorized for book.';
+});
 
 try {
-  await registerConformantTool({
-    widgetId: 'booking',
-    name: 'search',
-    description: 'Search available bookings.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Free-text booking search query.' }
-      },
-      required: ['query'],
-      additionalProperties: false
-    },
-    readOnly: true,
-    untrustedContent: false,
-    exposedTo: [HOST],
-    execute: async (input) => ({
-      content: [{
-        type: 'text',
-        text: `acme:search received query=${JSON.stringify(input?.query ?? null)}`
-      }]
-    })
+  await bootWidget({
+    onStatus(line) {
+      statusEl.textContent = line;
+      renderBookings();
+    }
   });
-  statusEl.textContent = 'registered search → exposedTo host';
-  parent.postMessage({ source: 'ambient-skeleton-widget', type: 'ready' }, '*');
+  renderCatalog();
+  renderBookings();
+  statusEl.textContent = 'Ready — search (read-only) and book (mutating, requires authorization).';
+  parent.postMessage({ source: 'ambient-widget', vendor: 'acme', type: 'ready' }, '*');
 } catch (cause) {
   statusEl.textContent = `registration failed: ${cause?.name ?? 'Error'}: ${cause?.message ?? cause}`;
-  parent.postMessage({ source: 'ambient-skeleton-widget', type: 'error', message: String(cause?.message ?? cause) }, '*');
+  parent.postMessage({ source: 'ambient-widget', vendor: 'acme', type: 'error', message: String(cause?.message ?? cause) }, '*');
 }
 </script>
 </body>
