@@ -45,7 +45,11 @@ if (typeof document.modelContext === 'object' && document.modelContext) {
       {
         name: 'thirdparty_probe',
         description: 'Probe tool proving third-party trial activation.',
-        inputSchema: { type: 'object', properties: {} }
+        inputSchema: { type: 'object', properties: {} },
+        // `execute` is a REQUIRED member. Omitting it makes registerTool throw a
+        // TypeError that looks like a trial failure but is not one — that false
+        // negative cost this probe its first run.
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] })
       },
       { exposedTo: ['https://ambient-host-tomiwaalukos-projects.vercel.app'] }
     );
@@ -69,12 +73,21 @@ const result = {
 document.getElementById('out').textContent = JSON.stringify(result, null, 2);
 
 const v = document.getElementById('verdict');
-if (trialActive && registerToolWorked && inject.isActuallyCrossOrigin) {
+// Order matters. Check test validity BEFORE reading the result, and separate
+// "the trial never activated" from "the trial activated but this probe's own
+// call was malformed" — conflating those two produces a false negative that
+// would kill a working claim.
+if (!inject.isActuallyCrossOrigin) {
+  v.textContent = 'INVALID TEST — script was not cross-origin, result means nothing';
+} else if (inject.modelContextBeforeInject !== 'undefined') {
+  v.textContent = 'INVALID TEST — page already had WebMCP before injection';
+} else if (!trialActive) {
+  v.textContent = 'THIRD-PARTY MATCHING FAILED — trial never activated, drop the claim';
+} else if (registerToolWorked) {
   v.textContent = 'THIRD-PARTY MATCHING WORKS — distribution claim holds';
-} else if (!inject.isActuallyCrossOrigin) {
-  v.textContent = 'INVALID TEST — script was not cross-origin';
 } else {
-  v.textContent = 'THIRD-PARTY MATCHING FAILED — drop the distribution claim';
+  v.textContent = `TRIAL ACTIVATED, but this probe's registerTool call failed: ${registerError}. ` +
+    'Trial activation is the thing under test and it succeeded — fix the call, do not read this as a token failure.';
 }
 
 // Expose for the harness to read without scraping the DOM.
