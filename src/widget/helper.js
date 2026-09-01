@@ -16,12 +16,7 @@ const PASSTHROUGH_PARAM_NAMES = new Set([
   'prompt',
   'instructions',
   'raw',
-  'payload',
-  'extra',
-  'metadata',
-  'input',
-  'body',
-  'message'
+  'extra'
 ]);
 
 /**

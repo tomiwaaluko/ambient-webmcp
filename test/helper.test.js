@@ -165,6 +165,34 @@ describe('validateInputSchema (R8)', () => {
       }
     );
   });
+
+  test('refuses raw as a passthrough parameter name', () => {
+    assert.throws(
+      () =>
+        validateInputSchema({
+          type: 'object',
+          properties: {
+            raw: { type: 'string' }
+          }
+        }),
+      (err) => {
+        assert.equal(err.code, 'SCHEMA_PASSTHROUGH_FIELD');
+        return true;
+      }
+    );
+  });
+
+  test('allows message as a typed capability parameter', () => {
+    assert.doesNotThrow(() =>
+      validateInputSchema({
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Message body to send.' }
+        },
+        required: ['message']
+      })
+    );
+  });
 });
 
 describe('registerConformantTool authorization (R38)', () => {
