@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind — third-party token matching probe</title>
+
+<!-- DELIBERATELY NO <meta http-equiv="origin-trial"> HERE.
+     This page must have NO first-party token of its own, or a positive result
+     would be indistinguishable from Northwind's own token doing the work.
+     sites/northwind-checkout/index.html keeps its static token, so R35 still
+     holds for the origin itself.
+
+     The script below is served by ACME, cross-origin. It injects Acme's
+     THIRD-PARTY token. If document.modelContext becomes available on this page,
+     third-party matching works and Ambient's vendor-distribution claim holds.
+     PRO-5 spike Q6, second half. -->
+<script src="https://acme-booking-tomiwaalukos-projects.vercel.app/ot-inject-3p.js"></script>
+
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; }
+  h1 { font-size: 1.05rem; margin: 0 0 .5rem; }
+  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .5rem;
+        border-radius: 4px; overflow-x: auto; font-size: 12px; }
+  .verdict { font-weight: 700; padding: .5rem; border-radius: 4px; margin: .5rem 0; }
+</style>
+</head>
+<body>
+  <h1>Northwind — third-party token matching probe</h1>
+  <div id="verdict" class="verdict">measuring…</div>
+  <pre id="out">measuring…</pre>
+
+<script type="module">
+const inject = window.__ot3p ?? { error: 'ot-inject-3p.js did not run (blocked, 404, or CSP)' };
+
+// The real proof is not that document.modelContext exists — it is that a tool
+// actually registers. A live modelContext with a dead registerTool would still
+// kill the claim.
+let registerToolWorked = null;
+let registerError = null;
+if (typeof document.modelContext === 'object' && document.modelContext) {
+  try {
+    await document.modelContext.registerTool(
+      {
+        name: 'thirdparty_probe',
+        description: 'Probe tool proving third-party trial activation.',
+        inputSchema: { type: 'object', properties: {} },
+        // `execute` is a REQUIRED member. Omitting it makes registerTool throw a
+        // TypeError that looks like a trial failure but is not one — that false
+        // negative cost this probe its first run.
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] })
+      },
+      { exposedTo: ['https://ambient-host-tomiwaalukos-projects.vercel.app'] }
+    );
+    registerToolWorked = true;
+  } catch (err) {
+    registerToolWorked = false;
+    registerError = `${err.name}: ${err.message}`;
+  }
+}
+
+const trialActive = typeof document.modelContext === 'object' && document.modelContext !== null;
+
+const result = {
+  ...inject,
+  trialActive,
+  registerToolWorked,
+  registerError,
+  modelContextTypeNow: typeof document.modelContext
+};
+
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+
+const v = document.getElementById('verdict');
+// Order matters. Check test validity BEFORE reading the result, and separate
+// "the trial never activated" from "the trial activated but this probe's own
+// call was malformed" — conflating those two produces a false negative that
+// would kill a working claim.
+if (!inject.isActuallyCrossOrigin) {
+  v.textContent = 'INVALID TEST — script was not cross-origin, result means nothing';
+} else if (inject.modelContextBeforeInject !== 'undefined') {
+  v.textContent = 'INVALID TEST — page already had WebMCP before injection';
+} else if (!trialActive) {
+  v.textContent = 'THIRD-PARTY MATCHING FAILED — trial never activated, drop the claim';
+} else if (registerToolWorked) {
+  v.textContent = 'THIRD-PARTY MATCHING WORKS — distribution claim holds';
+} else {
+  v.textContent = `TRIAL ACTIVATED, but this probe's registerTool call failed: ${registerError}. ` +
+    'Trial activation is the thing under test and it succeeded — fix the call, do not read this as a token failure.';
+}
+
+// Expose for the harness to read without scraping the DOM.
+window.__ot3pResult = result;
+</script>
+</body>
+</html>
