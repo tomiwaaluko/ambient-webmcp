@@ -23,10 +23,18 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SHARED_DIR = join(REPO_ROOT, 'src', 'shared');
+const HOST_DIR = join(REPO_ROOT, 'src', 'host');
+const WIDGET_HELPER = join(REPO_ROOT, 'src', 'widget', 'helper.js');
 const SITES_DIR = join(REPO_ROOT, 'sites');
 
 /** Sites that receive a copy of `src/shared`. */
 const SITES = ['host', 'acme-booking', 'northwind-checkout', 'zenith-support'];
+
+/** Extra copies beyond src/shared into site-specific directories. */
+const EXTRA_COPIES = [
+  { sourceDir: HOST_DIR, site: 'host', targetSubdir: 'host' },
+  { sourceFile: WIDGET_HELPER, site: 'acme-booking', targetSubdir: 'vendor', targetName: 'helper.js' }
+];
 
 const BANNER = [
   '// GENERATED FILE - DO NOT EDIT.',
@@ -44,6 +52,43 @@ async function sharedFiles() {
   return entries.filter((e) => e.isFile() && e.name.endsWith('.js')).map((e) => e.name);
 }
 
+/**
+ * @param {string} dir
+ * @returns {Promise<string[]>}
+ */
+async function jsFilesIn(dir) {
+  if (!existsSync(dir)) return [];
+  const entries = await readdir(dir, { withFileTypes: true });
+  return entries.filter((e) => e.isFile() && e.name.endsWith('.js')).map((e) => e.name);
+}
+
+/**
+ * @param {object} opts
+ * @param {boolean} opts.check
+ * @param {string[]} opts.stale
+ * @param {{ written: number }} opts.stats
+ * @param {string} opts.sourcePath
+ * @param {string} opts.targetPath
+ */
+async function syncOneFile({ check, stale, stats, sourcePath, targetPath, transform = (s) => s }) {
+  const raw = await readFile(sourcePath, 'utf8');
+  const source = transform(raw);
+  const desired = BANNER + source;
+  const current = existsSync(targetPath) ? await readFile(targetPath, 'utf8') : null;
+
+  if (current === desired) return;
+
+  if (check) {
+    stale.push(`${relative(REPO_ROOT, targetPath)} (${current === null ? 'missing' : 'stale'})`);
+    return;
+  }
+
+  await mkdir(dirname(targetPath), { recursive: true });
+  await writeFile(targetPath, desired, 'utf8');
+  stats.written += 1;
+  console.log(`sync-sites: wrote ${relative(REPO_ROOT, targetPath)}`);
+}
+
 async function main() {
   const check = process.argv.includes('--check');
   const files = await sharedFiles();
@@ -54,7 +99,7 @@ async function main() {
   }
 
   const stale = [];
-  let written = 0;
+  const stats = { written: 0 };
 
   for (const site of SITES) {
     const siteDir = join(SITES_DIR, site);
@@ -90,9 +135,44 @@ async function main() {
 
       await mkdir(vendorDir, { recursive: true });
       await writeFile(target, desired, 'utf8');
-      written += 1;
+      stats.written += 1;
       console.log(`sync-sites: wrote ${relative(REPO_ROOT, target)}`);
     }
+  }
+
+  for (const copy of EXTRA_COPIES) {
+    const siteDir = join(SITES_DIR, copy.site);
+    if (!existsSync(siteDir)) {
+      console.error(`sync-sites: missing site directory ${relative(REPO_ROOT, siteDir)}`);
+      process.exit(1);
+    }
+
+    if (copy.sourceDir) {
+      const names = await jsFilesIn(copy.sourceDir);
+      for (const name of names) {
+        await syncOneFile({
+          check,
+          stale,
+          stats,
+          sourcePath: join(copy.sourceDir, name),
+          targetPath: join(siteDir, copy.targetSubdir, name),
+          transform: (source) =>
+            source.replace(
+              /from '\.\.\/shared\/adapter\.js'/g,
+              "from '../vendor/adapter.js'"
+            )
+        });
+      }
+      continue;
+    }
+
+    await syncOneFile({
+      check,
+      stale,
+      stats,
+      sourcePath: copy.sourceFile,
+      targetPath: join(siteDir, copy.targetSubdir, copy.targetName)
+    });
   }
 
   if (check) {
@@ -107,9 +187,9 @@ async function main() {
   }
 
   console.log(
-    written === 0
+    stats.written === 0
       ? 'sync-sites: already up to date.'
-      : `sync-sites: ${written} file(s) written across ${SITES.length} sites.`
+      : `sync-sites: ${stats.written} file(s) written across ${SITES.length} sites.`
   );
 }
 

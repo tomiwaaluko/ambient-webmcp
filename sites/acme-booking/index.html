@@ -25,23 +25,44 @@
 </head>
 <body>
   <h1>Acme Booking</h1>
-  <p class="role">Widget vendor. Host-assigned label <code>acme</code>.</p>
-  <p class="role"><strong>PRO-5 spike build.</strong> Disposable — PRO-14 replaces it.</p>
+  <p class="role">Widget vendor. Host-assigned label <code>acme</code>, widget id <code>booking</code>.</p>
+  <p class="role"><strong>PRO-19 walking skeleton.</strong> One tool: <code>search</code>.</p>
   <pre id="status">booting…</pre>
 
-
 <script type="module">
-import { startSpikeWidget } from './vendor/spike-widget.js';
+import { registerConformantTool } from './vendor/helper.js';
 
-// PRO-5 spike build. Disposable — PRO-14 writes the real vendor page.
+const HOST = 'https://ambient-host-tomiwaalukos-projects.vercel.app';
 const statusEl = document.getElementById('status');
-const lines = [];
-const diagnostics = startSpikeWidget({
-  label: 'acme',
-  toolNames: ['acme_search', 'search'],
-  onLog(line) { lines.push(line); statusEl.textContent = lines.join('\n'); }
-});
-window.__spikeWidget = diagnostics;
+
+try {
+  await registerConformantTool({
+    widgetId: 'booking',
+    name: 'search',
+    description: 'Search available bookings.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Free-text booking search query.' }
+      },
+      required: ['query']
+    },
+    readOnly: true,
+    untrustedContent: false,
+    exposedTo: [HOST],
+    execute: async (input) => ({
+      content: [{
+        type: 'text',
+        text: `acme:search received query=${JSON.stringify(input?.query ?? null)}`
+      }]
+    })
+  });
+  statusEl.textContent = 'registered search → exposedTo host';
+  parent.postMessage({ source: 'ambient-skeleton-widget', type: 'ready' }, '*');
+} catch (cause) {
+  statusEl.textContent = `registration failed: ${cause?.name ?? 'Error'}: ${cause?.message ?? cause}`;
+  parent.postMessage({ source: 'ambient-skeleton-widget', type: 'error', message: String(cause?.message ?? cause) }, '*');
+}
 </script>
 </body>
 </html>
