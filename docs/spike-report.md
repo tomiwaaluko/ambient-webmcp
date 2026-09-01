@@ -53,9 +53,13 @@ The submission **may not** claim that Ambient's output is the agent's *only* sur
 
 **What remains reachable outside the governed surface, exactly:** for every origin the host allowlists and embeds, that origin's full raw tool list — original names (including colliding unqualified ones), original vendor-authored descriptions, and original annotations — retrievable by one `getTools({fromOrigins})` call from anything running script in the host page. This must be stated in the write-up (R34) and reflected in `CONTRACT.md` (PRO-6).
 
-### 4. Q6 is answered in one half only
+### 4. Q6 — RESOLVED 2026-09-01: both halves now OBSERVED working
 
-The **delivery mechanism** (external JS file creating the meta element at runtime) is OBSERVED working, top-level and inside a cross-origin iframe. **Third-party token *matching* is NOT OBSERVED** — no third-party token has been minted. See Q6. Do not claim the vendor-distribution mechanism works end-to-end until that token exists and is tested.
+~~Third-party token *matching* is NOT OBSERVED — no third-party token has been minted.~~
+
+**Superseded.** A third-party token was minted for acme (`isThirdParty: true`, verified by decode) and tested. **Both halves now hold: the vendor-distribution claim is proven, not merely plausible.** See Q6 Leg B below for the run.
+
+⚠️ **The first run of that test reported a FALSE NEGATIVE** ("THIRD-PARTY MATCHING FAILED"). The probe's own tool descriptor omitted the required `execute` member, so `registerTool` threw `TypeError: Failed to read the 'execute' property from 'ModelContextTool': Required member is undefined` — a malformed call, not a token failure. The activation evidence in that same run was already positive. Recorded because the failure mode is general: **a malformed WebMCP call and an inactive trial look similar from a distance, and conflating them nearly killed a protected claim.** Any probe that reports on trial status must separate "trial never activated" from "trial activated but my call was wrong."
 
 ---
 
@@ -326,9 +330,9 @@ afterDuplicate: 1
 
 ## Q6. Does a third-party origin trial token work from an external JS file inside a cross-origin iframe?
 
-**SPLIT ANSWER. Delivery mechanism: OBSERVED, works. Third-party matching: NOT OBSERVED.**
+**OBSERVED — YES, both legs.** *(Leg B resolved 2026-09-01, after a third-party token was minted.)*
 
-The question decomposes into two independent legs, and only one could be run with the tokens that exist.
+The question decomposes into two independent legs. Leg A was run first; Leg B was blocked on a token that did not exist yet, and was run once it did.
 
 ### Leg A — runtime meta injection from an external JS file: OBSERVED, WORKS
 
@@ -358,9 +362,40 @@ Three things this settles:
 
 Also confirmed in passing: `ot-probe.html` registers **without** `exposedTo`, and the host saw nothing from it (`hostSeesNorthwind: []`) — Q2 leg 2 reproducing on a third origin.
 
-### Leg B — third-party token *matching*: NOT OBSERVED
+### Leg B — third-party token *matching*: OBSERVED, WORKS
 
-**Reason: no third-party token exists.** All four minted tokens are first-party. Decoding the payloads shows plain first-party claims, e.g. Northwind's:
+**Resolved 2026-09-01.** A third-party token was minted for acme and tested. **The vendor-distribution claim holds.**
+
+The WebMCP trial *does* offer third-party matching — the minted token decodes with the claim present, which the four original tokens lack:
+
+```json
+{"origin":"https://acme-booking-tomiwaalukos-projects.vercel.app:443","feature":"WebMCP","expiry":1794873600,"isThirdParty":true}
+```
+
+**Test rig.** The earlier probe served `ot-inject.js` from Northwind itself — same-origin, so it could not test matching at all, since a third-party token is validated against the origin of the *script that injects it*. The rig was rebuilt:
+
+- `sites/acme-booking/ot-inject-3p.js` — served by **acme**, carries acme's third-party token
+- `sites/northwind-checkout/ot-probe-3p.html` — a **Northwind** page with no static token, loading acme's script cross-origin
+
+Run on Chrome 151, production deployment `79e4e59`:
+
+| Field | Value |
+|---|---|
+| `scriptOrigin` | `https://acme-booking-tomiwaalukos-projects.vercel.app` |
+| `documentOrigin` | `https://northwind-checkout-tomiwaalukos-projects.vercel.app` |
+| `isActuallyCrossOrigin` | **true** |
+| `modelContextBeforeInject` → `After` | `undefined` → **`object`** |
+| `trialActive` | **true** |
+| `registerToolWorked` | **true** |
+
+**Confound checked and cleared.** Northwind's `index.html` carries its own first-party token, so a positive result on that origin could have been Northwind's token doing the work. The probe page was verified against the **raw server response**, not the DOM: `curl` shows zero live `<meta http-equiv="origin-trial" content=`. The only textual match is the comment explaining its own absence. The activation can only have come from acme's third-party token.
+
+**What this proves.** A vendor's external JS file, carrying the vendor's own third-party token, turns WebMCP on for a *customer's* origin that has registered for nothing. That is Ambient's vendor-distribution argument working as a mechanism rather than as narration — and it is the thing the `foreign` control in Leg A showed a first-party token cannot do.
+
+<details>
+<summary>Superseded: why Leg B was originally NOT OBSERVED</summary>
+
+**Reason: no third-party token existed.** All four minted tokens were first-party. Decoding the payloads shows plain first-party claims, e.g. Northwind's:
 
 ```json
 {"origin":"https://northwind-checkout-tomiwaalukos-projects.vercel.app:443","feature":"WebMCP","expiry":1794873600}
@@ -378,16 +413,15 @@ and that the option is per-trial:
 
 The WebMCP origin trial announcement does not state whether WebMCP offers it. **Whether the WebMCP trial exposes third-party matching at all is unverified.**
 
-**What this means for the claim.** Leg A proves the *delivery* half is not a blocker: a vendor's external JS file can turn WebMCP on for the document it lands in. Leg B — that a vendor's token enables WebMCP on a *customer's* origin — is unproven, and the `foreign` control shows a first-party token will not do it. **Do not claim vendor distribution works end-to-end until a third-party token is minted and this is re-run.** See "For a human" below.
+**What this meant for the claim at the time.** Leg A proved the *delivery* half was not a blocker. Leg B — that a vendor's token enables WebMCP on a *customer's* origin — was unproven, and the `foreign` control showed a first-party token would not do it.
+
+</details>
 
 ---
 
 ## What a human must do
 
-1. **Mint a third-party WebMCP origin trial token** at <https://developer.chrome.com/origintrials> for `https://acme-booking-tomiwaalukos-projects.vercel.app`, with **Third-party matching** enabled — if the WebMCP trial offers the option. If it does not, that is itself the answer, and the vendor-distribution claim must be dropped or restated as untested. Then re-run Leg B:
-   - add the third-party token to `sites/northwind-checkout/ot-inject.js` as a fourth mode, served from **acme's** origin rather than Northwind's;
-   - load `ot-probe.html?ot=thirdparty` on Northwind with **no** first-party token, top-level and framed;
-   - `trialActive: true` there is the proof. `false` means the claim is dead.
+1. ~~**Mint a third-party WebMCP origin trial token.**~~ ✅ **DONE 2026-09-01.** Minted for acme with third-party matching, Leg B re-run, claim proven. See Q6 Leg B above.
 2. **Confirm Q5 against a real agent client** if one becomes available — attach the DevTools WebMCP panel or an agent extension to `https://ambient-host-tomiwaalukos-projects.vercel.app/` with two widgets mounted, and record whether its listed tools include the raw `search @ acme-booking` / `search @ zenith-support` entries. The claim-narrowing above is written to hold either way, but a direct observation would let PRO-18 be more precise.
 
 ## Handoffs
@@ -402,7 +436,9 @@ The WebMCP origin trial announcement does not state whether WebMCP offers it. **
 | Q5 narrowing: raw widget tools reachable via `fromOrigins` | **PRO-6**, **PRO-18** |
 | New reason codes: `TOOL_HANDLE_INVALID`, `MODEL_CONTEXT_UNAVAILABLE`, `INPUT_SHAPE_UNSUPPORTED`, `RESULT_PARSE_FAILED` | **PRO-6** |
 | Trial activation and Permissions Policy are independent failure modes | **PRO-16** (inspector must distinguish them) |
-| Q6 Leg B unproven | **PRO-7**, **PRO-18** |
+| Q6 Leg B **proven** — third-party token activates WebMCP on a customer origin cross-origin. Vendor-distribution claim holds; PRO-7 ships the third-party token, PRO-18 may state the claim | **PRO-7**, **PRO-18** |
+| Third-party token must be served from the **vendor's** origin — a same-origin injector cannot test or deliver matching | **PRO-7** |
+| A malformed `registerTool` descriptor (missing `execute`) throws a `TypeError` that reads like an inactive trial — separate the two when reporting status | **PRO-16** |
 
 ## Spike artifacts
 
@@ -416,6 +452,8 @@ Disposable — PRO-19 replaces the host side, PRO-14 the vendor pages.
 | `sites/host/index.html` | spike console, `window.spike` |
 | `sites/host/child.html` | same-origin control frame |
 | `sites/acme-booking/index.html`, `sites/zenith-support/index.html` | live spike widgets, both registering `search` |
-| `sites/northwind-checkout/ot-probe.html`, `ot-inject.js` | Q6 delivery probe; `index.html` keeps its static token so R35 still holds |
+| `sites/northwind-checkout/ot-probe.html`, `ot-inject.js` | Q6 **Leg A** delivery probe (same-origin injector); `index.html` keeps its static token so R35 still holds |
+| `sites/acme-booking/ot-inject-3p.js` | Q6 **Leg B** — acme-served injector carrying the third-party token. **Keep**: PRO-7 ships this mechanism |
+| `sites/northwind-checkout/ot-probe-3p.html` | Q6 **Leg B** probe — Northwind page, no static token, loads acme's injector cross-origin |
 
 Reproduce any run from the host page's DevTools console — `window.spike` exposes `mount`, `ask`, `snapshot`, `registerHostTool`, `executeToolCompat`, and `results`.
