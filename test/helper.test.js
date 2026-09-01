@@ -14,6 +14,7 @@ import {
 } from '../src/widget/helper.js';
 import {
   ATTESTED_RULE_IDS,
+  ATTESTATION_CLAIM_KEYS,
   buildAttestation,
   getAttestation,
   publishAttestation,
@@ -392,13 +393,19 @@ describe('surface-change notification (R10)', () => {
 });
 
 describe('attestation manifest (R37)', () => {
-  test('lists exactly the fixture attested-class rule ids', () => {
+  test('lists exactly the manifest attested-class rule ids', () => {
     assert.deepEqual([...ATTESTED_RULE_IDS], FIXTURE_ATTESTED_IDS);
     const attestation = buildAttestation({
       widgetId: 'booking',
       origin: 'https://acme-booking-tomiwaalukos-projects.vercel.app'
     });
     assert.deepEqual(attestation.attestedRules, FIXTURE_ATTESTED_IDS);
+    assert.deepEqual(Object.keys(attestation.claims).sort(), [...ATTESTATION_CLAIM_KEYS].sort());
+    assert.equal(attestation.claims.exposedToScoped.enforcedBy, 'registerConformantTool');
+    assert.equal(attestation.claims.authorizationEnforced.enforcedBy, 'registerConformantTool');
+    assert.equal(attestation.claims.untrustedContentMarked.enforcedBy, 'vendor');
+    assert.equal(attestation.claims.noSensitiveValues.enforcedBy, 'vendor');
+    assert.equal(attestation.attestedRules.includes('W4'), false);
   });
 
   test('publishAttestation exposes manifest on globalThis', () => {
@@ -408,6 +415,9 @@ describe('attestation manifest (R37)', () => {
     });
     assert.deepEqual(getAttestation().attestedRules, FIXTURE_ATTESTED_IDS);
     assert.deepEqual(globalThis.__ambientWidgetAttestation.attestedRules, FIXTURE_ATTESTED_IDS);
+    assert.deepEqual(Object.keys(globalThis.__ambientWidgetAttestation.claims).sort(), [
+      ...ATTESTATION_CLAIM_KEYS
+    ].sort());
   });
 });
 
