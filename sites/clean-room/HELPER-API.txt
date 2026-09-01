@@ -1,0 +1,29 @@
+Widget helper public API. This is documentation, not source.
+
+registerConformantTool({ widgetId, name, description, inputSchema, readOnly, untrustedContent, exposedTo, authorize, execute }) returns Promise<void>.
+
+- widgetId: string; widget-owned id only; no vendor label; no "."
+- name: unqualified verb
+- description: string
+- inputSchema: JSON Schema object
+- readOnly: boolean
+- untrustedContent: optional boolean
+- exposedTo: non-empty array of concrete HTTPS origin strings; no wildcards
+- authorize: required when readOnly is false; returns boolean or Promise<boolean>
+- execute: (input) => result or Promise<result>
+
+Throws ConformanceRefusal with .code (SCREAMING_SNAKE) and .message. Never fail silently.
+
+Do not put exposedTo on the tool descriptor. The helper does:
+await document.modelContext.registerTool(descriptor, { exposedTo })
+registerTool returns a Promise; await it.
+
+When readOnly is false, the helper requires authorize and wraps execute so a denied authorization does not run the vendor side effect.
+
+inputSchema must be a closed object schema with additionalProperties: false. Free-form passthrough names are refused (context, passthrough, prompt, instructions, raw, extra, and similar). A typed field such as message is allowed if the schema is closed.
+
+W8: the helper publishes attestation the checker can read:
+
+{ widgetId, origin, version: 1, attestedRules: ["W2","W3","W9","W10"], claims: { exposedToScoped, untrustedContentMarked, authorizationEnforced, noSensitiveValues } }
+
+Each claim is { statement, enforcedBy }. W4 is observed, not attested.
