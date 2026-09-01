@@ -36,6 +36,25 @@ const SITES = ['host', 'acme-booking', 'northwind-checkout', 'zenith-support'];
 /** Widget vendor sites that receive a copy of `src/widget/*.js`. Host excluded. */
 const WIDGET_SITES = ['acme-booking', 'northwind-checkout', 'zenith-support'];
 
+/**
+ * Shared modules that must not be copied into widget `vendor/` directories.
+ * `patterns.js` is the injection/credential detector — shipping it to widget
+ * origins hands a hostile vendor the expressions to tune around.
+ * The host may receive it (screening/redaction). Widget helper/attest/origin-trial
+ * vendoring is unchanged.
+ */
+const HOST_ONLY_SHARED = new Set(['patterns.js']);
+
+/**
+ * @param {string} site
+ * @param {string[]} shared
+ * @returns {string[]}
+ */
+function sharedForSite(site, shared) {
+  if (site === 'host') return shared;
+  return shared.filter((name) => !HOST_ONLY_SHARED.has(name));
+}
+
 const SHARED_BANNER = [
   '// GENERATED FILE - DO NOT EDIT.',
   '// Copied verbatim from src/shared/ by scripts/sync-sites.mjs.',
@@ -115,8 +134,9 @@ async function main() {
       process.exit(1);
     }
     const vendorDir = join(siteDir, 'vendor');
+    const sharedNames = sharedForSite(site, shared);
     const allowedVendorFiles = new Set([
-      ...shared,
+      ...sharedNames,
       ...(WIDGET_SITES.includes(site) ? widget : [])
     ]);
 
@@ -131,7 +151,7 @@ async function main() {
       }
     }
 
-    for (const name of shared) {
+    for (const name of sharedNames) {
       await syncOneFile({
         check,
         stale,
@@ -170,7 +190,7 @@ async function main() {
       console.error('Run: node scripts/sync-sites.mjs');
       process.exit(1);
     }
-    const sharedCount = shared.length * SITES.length;
+    const sharedCount = SITES.reduce((n, site) => n + sharedForSite(site, shared).length, 0);
     const widgetCount = widget.length * WIDGET_SITES.length;
     console.log(
       `sync-sites --check: all ${sharedCount + widgetCount} vendored copies are current.`
