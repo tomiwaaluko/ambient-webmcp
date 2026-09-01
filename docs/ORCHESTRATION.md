@@ -49,6 +49,8 @@ All four Vercel projects are live and serving production from `main` (root direc
 
 A separate **third-party** token also goes in the widget helper (PRO-7) — that one must be delivered from an external JS file, not a meta tag, and is what carries WebMCP onto any host embedding the widget.
 
+✅ **Minted and proven, 2026-09-01.** Acme holds a third-party token (`isThirdParty: true`, expiry 2026-11-17), committed in `sites/acme-booking/ot-inject-3p.js`. Verified on Chrome 151: served from acme, loaded cross-origin by a northwind page carrying no token of its own, it activated WebMCP there (`modelContext` `undefined` → `object`, `registerTool` succeeded). A first-party token cannot substitute — measured. PRO-7 copies this file's shape; the token must always be served from the **vendor's** origin, since it is validated against the origin of the injecting script.
+
 ## The graph
 
 ```mermaid
@@ -88,7 +90,7 @@ flowchart TB
 
 | Ticket | Unit | What | Blocked by | Blocks | Est | Tier |
 |---|---|---|---|---|---|---|
-| PRO-5 | U1 | Viability spike, 4 origins, 6 questions | — | all | 5 | Deep |
+| ~~PRO-5~~ ✅ | U1 | Viability spike, 4 origins, 6 questions — **DONE, merged** | — | all | 5 | Deep |
 | PRO-19 | U1.5 | Walking skeleton, disposable | PRO-5 | PRO-8 | 2 | Standard |
 | PRO-6 | U2 | `CONTRACT.md` + `rules/manifest.json` | PRO-5 | PRO-9, PRO-17 | 3 | Deep |
 | PRO-9 | U3+U4 | Checker: engine, CLI, own fixtures | PRO-6 | PRO-14, PRO-17 | 5 | Deep |
@@ -123,11 +125,17 @@ Two agents editing one file at the same time is the main avoidable conflict. Own
 
 ## Waves
 
-### Wave 0 — Gate 1 (serial, nothing else runs)
+### Wave 0 — Gate 1 ✅ PASSED 2026-09-01
 
-**PRO-5.** Proves the *platform* federates and answers six empirical questions. Three of them change what the submission may **claim**, not just how it is built — especially question 5 (can an agent see raw iframe tools alongside the proxies). If any answer narrows a claim, it must reach PRO-6 and PRO-18.
+**PRO-5 is done and merged.** Federation works on four live HTTPS origins, Chrome 151. All six questions have observed answers; `docs/spike-report.md` is on `main` and is required reading before any lane starts.
 
-Its failure mode is silent by construction: miss a leg of the three-way AND and you get an empty list with no error. That is why nothing runs alongside it.
+What it changed:
+
+- **One claim narrowing.** `getTools()` no-arg returns only host tools, but any script in the host page can retrieve widgets' raw tools verbatim via `fromOrigins`. The governed surface is the **default** one, not the **only** one. Propagated to PRO-6 and PRO-18.
+- **Third-party origin trial token proven.** A vendor's script activates WebMCP on a customer origin that registered for nothing. The vendor-distribution claim holds; nothing in PRO-7 is descoped.
+- **Three blocking API corrections** now embedded in PRO-7, PRO-8, PRO-16: `exposedTo` is `registerTool`'s second argument (silently dropped in the descriptor), `registerTool` returns a Promise that must be awaited, and `fromOrigins` is additive rather than a filter.
+
+Still open and non-blocking: confirming Q5 against a real agent client.
 
 ### Wave 1 — Gate 2 plus two lanes (3 concurrent)
 
