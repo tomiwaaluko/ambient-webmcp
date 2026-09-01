@@ -88,6 +88,16 @@ async function callProxy(name, input) {
 }
 
 /**
+ * Governed proxy results wrap widget JSON in the host envelope template.
+ * Strip it so the outcome UI can read structured fields.
+ * @param {string} text
+ */
+function unwrapEnvelopedText(text) {
+  const match = /^\[Third-party data from [^\]]+\] (.*) \[\/Third-party\]\s*$/s.exec(text);
+  return match ? match[1] : text;
+}
+
+/**
  * @param {{ ok: true, result: unknown } | { ok: false, code: string, message: string }} outcome
  * @returns {unknown}
  */
@@ -96,10 +106,11 @@ function extractPayload(outcome) {
   const result = /** @type {{ content?: Array<{ text?: string }> }} */ (outcome.result);
   const text = result?.content?.[0]?.text;
   if (typeof text !== 'string') return outcome.result;
+  const inner = unwrapEnvelopedText(text);
   try {
-    return JSON.parse(text);
+    return JSON.parse(inner);
   } catch {
-    return text;
+    return inner;
   }
 }
 
@@ -317,8 +328,19 @@ function renderToolList(listEl, snapshot) {
  * @param {{ onRevoke?: (origin: string) => void }} [options]
  */
 function mountInspector(container, snapshot, options) {
-  renderInspector(container, snapshot, options);
-  if (container.querySelector('[data-origin="generation"]')) {
+  try {
+    renderInspector(container, snapshot, options);
+    // Skeleton inspector iterates rows; a snapshot object would mark
+    // `generation` as an origin if it were for…in. for…of throws instead.
+    if (
+      snapshot &&
+      typeof snapshot === 'object' &&
+      !Array.isArray(snapshot) &&
+      container.querySelector('[data-origin="generation"]')
+    ) {
+      throw new Error('LEGACY_INSPECTOR_SNAPSHOT');
+    }
+  } catch {
     container.replaceChildren();
     renderInspector(container, snapshot.origins ?? []);
   }
