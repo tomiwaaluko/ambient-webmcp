@@ -2,24 +2,25 @@
 // Copied verbatim from src/widget/ by scripts/sync-sites.mjs.
 // Edit the source in src/widget/ and re-run: node scripts/sync-sites.mjs
 /**
- * Machine-readable widget attestation (R37).
+ * Machine-readable widget attestation (R37 / W8).
  *
- * Covers obligations the registered tool surface cannot reveal: hint truthfulness,
- * untrusted-content marking at runtime, and mutating-tool authorization.
- *
- * ATTESTED_RULE_IDS is fixture-coupled to PRO-6 rules/manifest.json — update when
- * the manifest lands so ids match the attested-class widget rules exactly.
+ * Covers obligations the registered tool surface cannot reveal. Rule ids and
+ * claim keys match rules/manifest.json attested-class widget rules W2, W3,
+ * W9, W10. W4 (read-only truthfulness) is observed — not attested here.
  */
 
 /**
- * Attested-class rule ids this helper attests to.
- * PRO-6 coupling: replace with manifest-derived ids when rules/manifest.json exists.
+ * Attested-class rule ids from rules/manifest.json (widget role, evidence: attested).
  * @type {readonly string[]}
  */
-export const ATTESTED_RULE_IDS = Object.freeze([
-  'widget-mutation-auth',
-  'widget-readonly-truthful',
-  'widget-untrusted-marked'
+export const ATTESTED_RULE_IDS = Object.freeze(['W2', 'W3', 'W9', 'W10']);
+
+/** Claim keys the checker reads via attestation-claim predicates (manifest notes.attestationClaims). */
+export const ATTESTATION_CLAIM_KEYS = Object.freeze([
+  'exposedToScoped',
+  'untrustedContentMarked',
+  'authorizationEnforced',
+  'noSensitiveValues'
 ]);
 
 /** @type {object | null} latest attestation emitted for this document */
@@ -40,19 +41,24 @@ export function buildAttestation({ widgetId, origin }) {
     version: 1,
     attestedRules: [...ATTESTED_RULE_IDS],
     claims: {
-      'widget-mutation-auth': {
+      exposedToScoped: {
         statement:
-          'Mutating tools registered through this helper invoke an authorization callback before any side effect.',
+          'exposedTo lists concrete HTTPS host origins only; wildcard entries are refused at registration.',
         enforcedBy: 'registerConformantTool'
       },
-      'widget-readonly-truthful': {
+      untrustedContentMarked: {
         statement:
-          'readOnlyHint on each registered tool truthfully reflects whether the tool mutates state.',
+          'Tools returning content the widget did not author are registered with untrustedContentHint.',
         enforcedBy: 'vendor'
       },
-      'widget-untrusted-marked': {
+      authorizationEnforced: {
         statement:
-          'Tools returning content the widget did not author carry untrustedContentHint.',
+          'Mutating tools invoke an authorization callback before any side effect; the registered execute handle cannot bypass it.',
+        enforcedBy: 'registerConformantTool'
+      },
+      noSensitiveValues: {
+        statement:
+          'Tools neither accept nor return credentials, secrets, tokens, or payment instrument numbers.',
         enforcedBy: 'vendor'
       }
     }
