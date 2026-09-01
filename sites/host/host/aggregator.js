@@ -43,7 +43,7 @@ let manifestCache = null;
 
 /**
  * @typedef {import('./lifecycle.js').OriginState} OriginState
- * @typedef {{ state: OriginState, tools: string[], changeTimestamps: number[], dropRecords: object[], concurrencyGate: ReturnType<typeof createConcurrencyGate> }} OriginRuntime
+ * @typedef {{ state: OriginState, tools: string[], changeTimestamps: number[], dropRecords: object[], inFlightAtRevoke?: number, concurrencyGate: ReturnType<typeof createConcurrencyGate> }} OriginRuntime
  */
 
 function parseInputSchema(inputSchema) {
@@ -111,6 +111,7 @@ function getOriginRuntime(origin) {
       tools: [],
       changeTimestamps: [],
       dropRecords: [],
+      inFlightAtRevoke: 0,
       concurrencyGate: createConcurrencyGate(MAX_CONCURRENT_EXECUTIONS_PER_ORIGIN)
     };
     originRuntime.set(origin, runtime);
@@ -135,6 +136,123 @@ function withdrawOriginProxies(origin) {
       withdrawProxy(name);
     }
   }
+}
+
+/**
+ * @param {string} origin
+ * @param {OriginRuntime} runtime
+ * @param {string[]} [toolsOverride]
+ */
+function originRowFromRuntime(origin, runtime, toolsOverride) {
+  const withdrawn = runtime.state.state === 'revoking' || runtime.state.state === 'revoked';
+  const tools = withdrawn
+    ? []
+    : toolsOverride !== undefined
+      ? [...toolsOverride]
+      : [...runtime.tools];
+  return {
+    origin,
+    state: runtime.state.state,
+    reason: runtime.state.reason,
+    tools,
+    dropRecords: [...runtime.dropRecords],
+    inFlight: runtime.concurrencyGate.active(),
+    inFlightAtRevoke: runtime.inFlightAtRevoke ?? 0
+  };
+}
+
+function buildSnapshot(errors = []) {
+  const origins = [];
+  const seen = new Set();
+  for (const origin of Object.keys(ALLOWLIST)) {
+    const runtime = originRuntime.get(origin);
+    if (!runtime) continue;
+    seen.add(origin);
+    origins.push(originRowFromRuntime(origin, runtime));
+  }
+  for (const [origin, runtime] of originRuntime) {
+    if (seen.has(origin)) continue;
+    origins.push(originRowFromRuntime(origin, runtime));
+  }
+  return { generation, origins, errors };
+}
+
+function emitSnapshot(errors = []) {
+  const snapshot = buildSnapshot(errors);
+  onUpdate?.(snapshot);
+  return snapshot;
+}
+
+function yieldBetweenStates() {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+    queueMicrotask(resolve);
+  });
+}
+
+/**
+ * Host-owner revocation: active|degraded|quarantined → revoking → revoked.
+ * Withdraws proxies for the origin. Does not cancel in-flight side effects;
+ * late results are dropped by executeProxy and recorded on dropRecords.
+ *
+ * @param {string} origin
+ * @returns {Promise<object[]>} snapshots at revoking then revoked
+ */
+export async function revokeOrigin(origin) {
+  const runtime = originRuntime.get(origin);
+  if (!runtime) {
+    throw new Error(`Cannot revoke unknown origin: ${origin}`);
+  }
+
+  runtime.inFlightAtRevoke = runtime.concurrencyGate.active();
+
+  moveOrigin(runtime, 'revoking', 'Host owner requested revocation.');
+  withdrawOriginProxies(origin);
+  runtime.tools = [];
+
+  const revokingSnapshot = emitSnapshot();
+  await yieldBetweenStates();
+
+  moveOrigin(runtime, 'revoked', 'Host owner revoked this origin; proxies withdrawn.');
+  const revokedSnapshot = emitSnapshot();
+  return [revokingSnapshot, revokedSnapshot];
+}
+
+/**
+ * @param {string} origin
+ * @param {{ state?: import('./lifecycle.js').OriginStateName, reason?: string, tools?: string[], dropRecords?: object[], proxyNames?: string[], inFlight?: number }} [opts]
+ */
+export function seedOriginForTests(
+  origin,
+  {
+    state = 'active',
+    reason = 'Seeded for tests.',
+    tools = [],
+    dropRecords = [],
+    proxyNames = [],
+    inFlight = 0
+  } = {}
+) {
+  const runtime = getOriginRuntime(origin);
+  runtime.state = { state, reason };
+  runtime.tools = [...tools];
+  runtime.dropRecords = [...dropRecords];
+  runtime.inFlightAtRevoke = 0;
+  runtime.concurrencyGate = createConcurrencyGate(MAX_CONCURRENT_EXECUTIONS_PER_ORIGIN);
+  for (let i = 0; i < inFlight; i += 1) {
+    runtime.concurrencyGate.tryAcquire();
+  }
+  for (const name of proxyNames) {
+    registeredProxies.set(name, {
+      sourceTool: {},
+      abort: new AbortController(),
+      origin
+    });
+  }
+  return runtime;
 }
 
 export function setManifestForTests(manifest) {
@@ -272,17 +390,15 @@ export async function aggregateOnce() {
       const runtime = getOriginRuntime(origin);
       const originTools = allTools.filter((tool) => tool.origin === origin);
 
+      if (runtime.state.state === 'revoked' || runtime.state.state === 'revoking') {
+        origins.push(originRowFromRuntime(origin, runtime));
+        continue;
+      }
+
       if (originTools.length === 0) {
-        if (runtime.state.state !== 'revoked' && runtime.state.state !== 'revoking') {
-          moveOrigin(runtime, 'evaluating', 'No tools reported on this pass.');
-          moveOrigin(runtime, 'degraded', 'Embedded origin reported no tools.');
-        }
-        origins.push({
-          origin,
-          state: runtime.state.state,
-          reason: runtime.state.reason,
-          tools: runtime.tools
-        });
+        moveOrigin(runtime, 'evaluating', 'No tools reported on this pass.');
+        moveOrigin(runtime, 'degraded', 'Embedded origin reported no tools.');
+        origins.push(originRowFromRuntime(origin, runtime));
         continue;
       }
 
@@ -293,12 +409,8 @@ export async function aggregateOnce() {
         moveOrigin(runtime, 'evaluating', rateCheck.message);
         moveOrigin(runtime, 'degraded', rateCheck.message);
         errors.push({ origin, code: rateCheck.code, message: rateCheck.message });
-        origins.push({
-          origin,
-          state: runtime.state.state,
-          reason: runtime.state.reason,
-          tools: []
-        });
+        runtime.tools = [];
+        origins.push(originRowFromRuntime(origin, runtime, []));
         continue;
       }
 
@@ -308,12 +420,8 @@ export async function aggregateOnce() {
         moveOrigin(runtime, 'evaluating', countCheck.message);
         moveOrigin(runtime, 'degraded', countCheck.message);
         errors.push({ origin, code: countCheck.code, message: countCheck.message });
-        origins.push({
-          origin,
-          state: runtime.state.state,
-          reason: runtime.state.reason,
-          tools: []
-        });
+        runtime.tools = [];
+        origins.push(originRowFromRuntime(origin, runtime, []));
         continue;
       }
 
@@ -330,12 +438,8 @@ export async function aggregateOnce() {
         withdrawOriginProxies(origin);
         moveOrigin(runtime, 'quarantined', screen.reason);
         errors.push({ origin, code: screen.code, message: screen.reason });
-        origins.push({
-          origin,
-          state: runtime.state.state,
-          reason: runtime.state.reason,
-          tools: []
-        });
+        runtime.tools = [];
+        origins.push(originRowFromRuntime(origin, runtime, []));
         continue;
       }
 
@@ -358,12 +462,7 @@ export async function aggregateOnce() {
         moveOrigin(runtime, 'degraded', 'No proxies could be registered.');
       }
 
-      origins.push({
-        origin,
-        state: runtime.state.state,
-        reason: runtime.state.reason,
-        tools: proxyNames
-      });
+      origins.push(originRowFromRuntime(origin, runtime, proxyNames));
     }
 
     if (myGeneration !== generation) {
