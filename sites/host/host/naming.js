@@ -1,20 +1,55 @@
 // GENERATED FILE - DO NOT EDIT.
-// Copied verbatim from src/shared/ by scripts/sync-sites.mjs.
-// Edit the source in src/shared/ and re-run: node scripts/sync-sites.mjs
+// Copied from src/host/ by scripts/sync-sites.mjs (import paths adjusted for deployment).
+// Edit the source in src/host/ and re-run: node scripts/sync-sites.mjs
 /**
  * Compose host-assigned federated tool names.
  *
- * Pure logic — no DOM access. PRO-8 adds instance-limit checks here.
+ * Pure logic — no DOM access.
  */
 
 const MAX_NAME_LENGTH = 128;
 const LEGAL_NAME = /^[A-Za-z0-9_.-]+$/;
 
 /**
- * @param {{ vendorLabel: string, widgetId: string, verb: string }} parts
+ * @param {string} vendorLabel
+ * @param {string} widgetId
+ * @returns {string}
+ */
+export function identityKey(vendorLabel, widgetId) {
+  return `${vendorLabel}.${widgetId}`;
+}
+
+/**
+ * @param {Map<string, { window: object }>} registry
+ * @param {string} key
+ * @param {object} windowRef
+ * @returns {{ ok: true } | { ok: false, code: string, message: string }}
+ */
+export function claimInstance(registry, key, windowRef) {
+  const existing = registry.get(key);
+  if (existing && existing.window !== windowRef) {
+    return {
+      ok: false,
+      code: 'INSTANCE_LIMIT_REACHED',
+      message: `Only one instance of ${key} may federate on this page; another live instance is already registered.`
+    };
+  }
+  if (!existing) {
+    registry.set(key, { window: windowRef });
+  }
+  return { ok: true };
+}
+
+/**
+ * @param {{ vendorLabel: string, widgetId: string, verb: string, windowRef?: object, instanceRegistry?: Map<string, { window: object }> }} parts
  * @returns {{ ok: true, name: string } | { ok: false, code: string, message: string }}
  */
-export function composeName({ vendorLabel, widgetId, verb }) {
+export function composeName({ vendorLabel, widgetId, verb, windowRef, instanceRegistry }) {
+  if (instanceRegistry && windowRef) {
+    const claimed = claimInstance(instanceRegistry, identityKey(vendorLabel, widgetId), windowRef);
+    if (!claimed.ok) return claimed;
+  }
+
   const name = `${vendorLabel}.${widgetId}.${verb}`;
 
   if (name.length > MAX_NAME_LENGTH) {
