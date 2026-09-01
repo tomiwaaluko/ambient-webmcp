@@ -13,9 +13,9 @@ Read **`AGENTS.md`** at the repo root before writing any code. It routes you to:
 
 ## Non-negotiable
 
-1. **No build step, no dependencies, no framework extraction.** Hand-authored ES modules served static; tests use `node --test`.
+1. **No build step, no dependencies, no framework extraction.** Hand-authored ES modules served static; tests use `npm test` (bare `node --test`). `package.json` carries `"type": "module"` and the test alias only — it has no dependencies, and adding any violates this rule.
 2. **Never overclaim.** Ambient does not prevent prompt injection, does not do generic false-read-only detection, and cannot cancel an in-flight side effect. Binds identifiers and comments, not just prose.
 3. **Never fail silently.** Distinct reason code per cause; never truncate silently.
 4. **The plan wins** over a ticket that contradicts it — surface the conflict rather than guessing.
-5. **Do not merge your own PR.** Self-review the diff, run `node --test test/`, paste output into the PR.
+5. **Do not merge your own PR.** Self-review the diff, run **`npm test`**, paste output into the PR. ⚠️ Not `node --test test/` — the directory argument fails with `MODULE_NOT_FOUND` on Node 24 + Windows.
 6. **Check the file-ownership table** in `docs/ORCHESTRATION.md` before editing — other agents are working in parallel.

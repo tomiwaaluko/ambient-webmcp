@@ -889,7 +889,7 @@ The convergence point is U11 and U12, which are the first units where a wrong as
 
 | Gate | Command or method | Applies to |
 |---|---|---|
-| Unit tests | `node --test test/` | U3, U5, U6, U7, U8, U9, U12 |
+| Unit tests | `npm test` (bare `node --test`; the `node --test test/` directory form fails with `MODULE_NOT_FOUND` on Node 24 + Windows) | U3, U5, U6, U7, U8, U9, U12 |
 | Conformance gate | `node src/checker/cli.js --origin <url>` — must exit zero before any vendor deploy | U4, U10, U13 |
 | Deploy prep | `node scripts/sync-sites.mjs` before each origin deploy | U1, U10, U11 |
 | Spike gates answered | `docs/spike-report.md` records an observed answer for all six questions | U1 |
@@ -913,7 +913,7 @@ There is no CI. The checker CLI is the gate, run locally before each redeploy; a
 - No claim in `CONTRACT.md`, `README.md`, or the video asserts a guarantee the implementation does not deliver — specifically, nothing claims containment of prompt injection, generic false-read-only detection, or that revocation cancels an in-flight side effect.
 - All six spike-gate questions have recorded answers, and any answer that narrows a claim has been propagated to the contract, the written description, and the video script.
 - All four origins live over HTTPS with active trial tokens valid past the judging window.
-- `node --test test/` passes; `node src/checker/cli.js` exits zero against all three conformant vendor origins.
+- `npm test` passes; `node src/checker/cli.js` exits zero against all three conformant vendor origins.
 - Abandoned-attempt code is removed. A three-day parallel build accumulates dead ends; the shipped diff contains no unused module, no commented-out approach, and no scratch origin beyond `sites/clean-room/` if retained deliberately.
 - The repository contains no generalized framework extraction or package infrastructure — the reference implementation proves the contract and stops there.
 
