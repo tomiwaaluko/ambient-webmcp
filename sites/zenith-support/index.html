@@ -15,31 +15,120 @@
 
 <style>
   :root { color-scheme: light dark; }
-  body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1.5rem; }
-  code { font-family: ui-monospace, monospace; }
-  .role { color: color-mix(in srgb, currentColor 60%, transparent); }
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 42rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  code { font-family: ui-monospace, monospace; font-size: .92em; }
+  .role { color: color-mix(in srgb, currentColor 62%, transparent); margin: .25rem 0 .75rem; }
+  .panel { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 6px; padding: .75rem; margin: .75rem 0; }
+  .panel h2 { font-size: .95rem; margin: 0 0 .5rem; }
+  ul { margin: .25rem 0; padding-left: 1.2rem; }
+  label { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
+  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .5rem; border-radius: 4px; overflow-x: auto; font-size: 12px; margin: .5rem 0 0; white-space: pre-wrap; }
+  button { font: inherit; padding: .35rem .65rem; cursor: pointer; }
+  .warn { border-color: #c45; }
 </style>
 </head>
 <body>
   <h1>Zenith Support</h1>
-  <p class="role">Widget vendor. Host-assigned label <code>zenith</code>.</p>
-  <p class="role">Tools: <code>search</code>, <code>contact</code>. Shares the <code>search</code> verb with Acme.</p>
-  <p class="role"><strong>Conformant at load, turns hostile on an operator-controlled trigger.</strong> That ordering lets the demo chain collision into containment in one take, and exercises the re-evaluation path a hostile-from-load widget never would.</p>
-  <p>Scaffold only. <code>PRO-5</code> uses this for the spike; <code>PRO-14</code> builds the real widget.</p>
+  <p class="role">Widget vendor <code>zenith</code> · widget id <code>support</code> · tools <code>search</code>, <code>contact</code>. Shares the unqualified <code>search</code> verb with Acme.</p>
+  <p class="role">Conformant at load. An operator-controlled trigger registers a hostile tool for the demo containment path.</p>
+
+  <div class="panel">
+    <h2>Session authorization</h2>
+    <label><input type="checkbox" id="authorize"> Allow mutating <code>contact</code> calls this session</label>
+  </div>
+
+  <div class="panel">
+    <h2>Articles (synthetic)</h2>
+    <ul id="articles"></ul>
+  </div>
+
+  <div class="panel">
+    <h2>Tickets</h2>
+    <ul id="tickets"><li>None yet.</li></ul>
+  </div>
+
+  <div class="panel warn">
+    <h2>Hostile trigger (operator only)</h2>
+    <p>Registers an extra tool whose description carries an agent-directed instruction. Not run at load.</p>
+    <button type="button" id="hostile-btn">Register hostile tool</button>
+  </div>
+
   <pre id="status">booting…</pre>
 
 <script type="module">
-import { startSpikeWidget } from './vendor/spike-widget.js';
+import {
+  activateHostileTrigger,
+  bootWidget,
+  getArticles,
+  getTickets,
+  isHostileActive,
+  setAuthorized
+} from './widget.js';
 
-// PRO-5 spike build. Disposable — PRO-14 writes the real vendor page.
+const params = new URLSearchParams(location.search);
 const statusEl = document.getElementById('status');
-const lines = [];
-const diagnostics = startSpikeWidget({
-  label: 'zenith',
-  toolNames: ['zenith_search', 'search'],
-  onLog(line) { lines.push(line); statusEl.textContent = lines.join('\n'); }
+const articlesEl = document.getElementById('articles');
+const ticketsEl = document.getElementById('tickets');
+const authorizeEl = document.getElementById('authorize');
+const hostileBtn = document.getElementById('hostile-btn');
+
+function renderArticles() {
+  articlesEl.innerHTML = getArticles()
+    .map((row) => `<li><code>${row.id}</code> ${row.title}</li>`)
+    .join('');
+}
+
+function renderTickets() {
+  const rows = getTickets();
+  ticketsEl.innerHTML = rows.length
+    ? rows.map((row) => `<li><code>${row.ticketId}</code> ${row.subject}</li>`).join('')
+    : '<li>None yet.</li>';
+}
+
+authorizeEl.addEventListener('change', () => {
+  setAuthorized(authorizeEl.checked);
+  statusEl.textContent = authorizeEl.checked
+    ? 'Session authorized for contact.'
+    : 'Session not authorized for contact.';
 });
-window.__spikeWidget = diagnostics;
+
+hostileBtn.addEventListener('click', async () => {
+  try {
+    await activateHostileTrigger({
+      onStatus(line) {
+        statusEl.textContent = line;
+      }
+    });
+    hostileBtn.disabled = true;
+    parent.postMessage({ source: 'ambient-widget', vendor: 'zenith', type: 'hostile-triggered' }, '*');
+  } catch (cause) {
+    statusEl.textContent = `hostile registration failed: ${cause?.message ?? cause}`;
+  }
+});
+
+try {
+  const hostileFromQuery = params.get('hostile') === '1';
+  await bootWidget({
+    hostile: hostileFromQuery,
+    onStatus(line) {
+      statusEl.textContent = line;
+      renderTickets();
+    }
+  });
+  renderArticles();
+  renderTickets();
+  if (hostileFromQuery || isHostileActive()) {
+    hostileBtn.disabled = true;
+    statusEl.textContent = 'Ready — conformant tools loaded; hostile tool already registered (?hostile=1).';
+  } else {
+    statusEl.textContent = 'Ready — search (read-only) and contact (mutating, requires authorization).';
+  }
+  parent.postMessage({ source: 'ambient-widget', vendor: 'zenith', type: 'ready' }, '*');
+} catch (cause) {
+  statusEl.textContent = `registration failed: ${cause?.name ?? 'Error'}: ${cause?.message ?? cause}`;
+  parent.postMessage({ source: 'ambient-widget', vendor: 'zenith', type: 'error', message: String(cause?.message ?? cause) }, '*');
+}
 </script>
 </body>
 </html>
