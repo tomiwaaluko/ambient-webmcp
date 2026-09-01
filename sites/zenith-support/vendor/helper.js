@@ -131,10 +131,10 @@ export function validateInputSchema(inputSchema) {
   /** @type {Record<string, unknown>} */
   const schema = /** @type {Record<string, unknown>} */ (inputSchema);
 
-  if (schema.additionalProperties === true) {
+  if (schema.additionalProperties !== false) {
     refuse(
-      'SCHEMA_PASSTHROUGH_FIELD',
-      'inputSchema must not allow additionalProperties — no free-form passthrough fields.'
+      'SCHEMA_ADDITIONAL_PROPERTIES',
+      'inputSchema must set additionalProperties to false — omitting it leaves a passthrough channel open.'
     );
   }
 

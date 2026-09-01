@@ -45,7 +45,8 @@ try {
       properties: {
         query: { type: 'string', description: 'Free-text booking search query.' }
       },
-      required: ['query']
+      required: ['query'],
+      additionalProperties: false
     },
     readOnly: true,
     untrustedContent: false,

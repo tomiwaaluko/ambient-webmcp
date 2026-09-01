@@ -133,7 +133,24 @@ describe('validateExposedTo (R5)', () => {
   });
 });
 
-describe('validateInputSchema (R8)', () => {
+describe('validateInputSchema (R8 / W5)', () => {
+  test('refuses schema with properties but no additionalProperties', () => {
+    assert.throws(
+      () =>
+        validateInputSchema({
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query']
+        }),
+      (err) => {
+        assert.equal(err.code, 'SCHEMA_ADDITIONAL_PROPERTIES');
+        return true;
+      }
+    );
+  });
+
   test('refuses a free-form context parameter', () => {
     assert.throws(
       () =>
@@ -141,7 +158,8 @@ describe('validateInputSchema (R8)', () => {
           type: 'object',
           properties: {
             context: { type: 'string' }
-          }
+          },
+          additionalProperties: false
         }),
       (err) => {
         assert.equal(err.code, 'SCHEMA_PASSTHROUGH_FIELD');
@@ -150,7 +168,7 @@ describe('validateInputSchema (R8)', () => {
     );
   });
 
-  test('refuses additionalProperties passthrough at root', () => {
+  test('refuses additionalProperties true at root', () => {
     assert.throws(
       () =>
         validateInputSchema({
@@ -161,7 +179,7 @@ describe('validateInputSchema (R8)', () => {
           }
         }),
       (err) => {
-        assert.equal(err.code, 'SCHEMA_PASSTHROUGH_FIELD');
+        assert.equal(err.code, 'SCHEMA_ADDITIONAL_PROPERTIES');
         return true;
       }
     );
@@ -174,7 +192,8 @@ describe('validateInputSchema (R8)', () => {
           type: 'object',
           properties: {
             raw: { type: 'string' }
-          }
+          },
+          additionalProperties: false
         }),
       (err) => {
         assert.equal(err.code, 'SCHEMA_PASSTHROUGH_FIELD');
@@ -183,14 +202,15 @@ describe('validateInputSchema (R8)', () => {
     );
   });
 
-  test('allows message as a typed capability parameter', () => {
+  test('allows message as a typed capability parameter with closed schema', () => {
     assert.doesNotThrow(() =>
       validateInputSchema({
         type: 'object',
         properties: {
           message: { type: 'string', description: 'Message body to send.' }
         },
-        required: ['message']
+        required: ['message'],
+        additionalProperties: false
       })
     );
   });
@@ -207,7 +227,8 @@ describe('registerConformantTool authorization (R38)', () => {
           inputSchema: {
             type: 'object',
             properties: { id: { type: 'string' } },
-            required: ['id']
+            required: ['id'],
+            additionalProperties: false
           },
           readOnly: false,
           exposedTo: [HOST],
@@ -230,7 +251,8 @@ describe('registerConformantTool authorization (R38)', () => {
       inputSchema: {
         type: 'object',
         properties: { id: { type: 'string' } },
-        required: ['id']
+        required: ['id'],
+        additionalProperties: false
       },
       readOnly: false,
       exposedTo: [HOST],
@@ -259,7 +281,8 @@ describe('registerConformantTool authorization (R38)', () => {
       inputSchema: {
         type: 'object',
         properties: { query: { type: 'string' } },
-        required: ['query']
+        required: ['query'],
+        additionalProperties: false
       },
       readOnly: false,
       exposedTo: [HOST],
@@ -280,7 +303,8 @@ describe('registerConformantTool platform wiring', () => {
       inputSchema: {
         type: 'object',
         properties: { query: { type: 'string' } },
-        required: ['query']
+        required: ['query'],
+        additionalProperties: false
       },
       readOnly: true,
       exposedTo: [HOST],
@@ -299,7 +323,8 @@ describe('registerConformantTool platform wiring', () => {
       inputSchema: {
         type: 'object',
         properties: { query: { type: 'string' } },
-        required: ['query']
+        required: ['query'],
+        additionalProperties: false
       },
       readOnly: true,
       untrustedContent: true,
@@ -327,7 +352,8 @@ describe('registerConformantTool platform wiring', () => {
       inputSchema: {
         type: 'object',
         properties: { query: { type: 'string' } },
-        required: ['query']
+        required: ['query'],
+        additionalProperties: false
       },
       readOnly: true,
       exposedTo: [HOST],
@@ -348,7 +374,8 @@ describe('surface-change notification (R10)', () => {
       inputSchema: {
         type: 'object',
         properties: { query: { type: 'string' } },
-        required: ['query']
+        required: ['query'],
+        additionalProperties: false
       },
       readOnly: true,
       exposedTo: [HOST],
@@ -373,7 +400,8 @@ describe('surface-change notification (R10)', () => {
         inputSchema: {
           type: 'object',
           properties: { query: { type: 'string' } },
-          required: ['query']
+          required: ['query'],
+          additionalProperties: false
         },
         readOnly: true,
         exposedTo: [HOST],
