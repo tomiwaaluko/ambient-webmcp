@@ -2,7 +2,7 @@
 // Copied from src/host/ by scripts/sync-sites.mjs (import paths adjusted for deployment).
 // Edit the source in src/host/ and re-run: node scripts/sync-sites.mjs
 /**
- * Host aggregator — phases 1-2: discovery, naming, screening, envelope.
+ * Host aggregator — discovery, screening, envelope, proxy registration.
  *
  * Governed surface is the default one; raw widget tools remain reachable via
  * getTools({ fromOrigins }) from host script (spike Q5).
@@ -10,17 +10,23 @@
 
 import { ALLOWLIST } from '../allowlist.js';
 import { composeName } from './naming.js';
-import { buildEnvelope, buildFailureEnvelope } from './envelope.js';
+import { buildEnvelope } from './envelope.js';
 import { screenOrigin, screenPublished } from './screening.js';
-import { executeToolCompat } from '../vendor/adapter.js';
+import { executeProxy, createConcurrencyGate } from './proxy.js';
+import { transition, initialState } from './lifecycle.js';
+import {
+  checkToolCountBound,
+  checkSurfaceChangeRateBound,
+  MAX_CONCURRENT_EXECUTIONS_PER_ORIGIN
+} from './bounds.js';
 
 export { ALLOWLIST };
 
 /** @type {Map<string, { sourceTool: object, abort: AbortController, origin: string }>} */
 const registeredProxies = new Map();
 
-/** @type {Map<string, { state: string, reason: string, tools: string[] }>} */
-const originStates = new Map();
+/** @type {Map<string, OriginRuntime>} */
+const originRuntime = new Map();
 
 /** @type {Map<string, { window: object }>} */
 const instanceRegistry = new Map();
@@ -34,6 +40,11 @@ let onUpdate = null;
 
 /** @type {object | null} */
 let manifestCache = null;
+
+/**
+ * @typedef {import('./lifecycle.js').OriginState} OriginState
+ * @typedef {{ state: OriginState, tools: string[], changeTimestamps: number[], dropRecords: object[], concurrencyGate: ReturnType<typeof createConcurrencyGate> }} OriginRuntime
+ */
 
 function parseInputSchema(inputSchema) {
   if (typeof inputSchema === 'string') {
@@ -92,13 +103,23 @@ function buildProxyAnnotations(tool) {
   return annotations;
 }
 
-function getOriginState(origin) {
-  let state = originStates.get(origin);
-  if (!state) {
-    state = { state: 'discovering', reason: 'Origin discovered.', tools: [] };
-    originStates.set(origin, state);
+function getOriginRuntime(origin) {
+  let runtime = originRuntime.get(origin);
+  if (!runtime) {
+    runtime = {
+      state: initialState('discovering', 'Origin discovered.'),
+      tools: [],
+      changeTimestamps: [],
+      dropRecords: [],
+      concurrencyGate: createConcurrencyGate(MAX_CONCURRENT_EXECUTIONS_PER_ORIGIN)
+    };
+    originRuntime.set(origin, runtime);
   }
-  return state;
+  return runtime;
+}
+
+function moveOrigin(runtime, next, reason) {
+  runtime.state = transition(runtime.state, next, reason);
 }
 
 function withdrawProxy(proxyName) {
@@ -167,6 +188,7 @@ async function registerProxyForTool(tool, entry, origin, manifest) {
   }
 
   const envelopedSchema = envelopeInputSchema(inputSchema, origin);
+  const runtime = getOriginRuntime(origin);
   const abort = new AbortController();
   const sourceTool = tool;
 
@@ -177,14 +199,20 @@ async function registerProxyForTool(tool, entry, origin, manifest) {
       inputSchema: envelopedSchema,
       annotations: buildProxyAnnotations(tool),
       async execute(input) {
-        const outcome = await executeToolCompat(sourceTool, input);
+        const outcome = await executeProxy({
+          sourceTool,
+          input,
+          origin,
+          isRevoked: () =>
+            runtime.state.state === 'revoked' || runtime.state.state === 'revoking',
+          isUnavailable: () => !sourceTool || sourceTool.window?.closed === true,
+          concurrencyGate: runtime.concurrencyGate,
+          onDrop: (record) => {
+            runtime.dropRecords.push(record);
+          }
+        });
         if (!outcome.ok) {
-          const { text } = buildFailureEnvelope({
-            origin,
-            code: outcome.code,
-            message: outcome.message
-          });
-          return { content: [{ type: 'text', text }] };
+          return { content: [{ type: 'text', text: outcome.text }] };
         }
         return outcome.result;
       }
@@ -241,20 +269,55 @@ export async function aggregateOnce() {
       }
 
       const entry = ALLOWLIST[origin];
-      const runtime = getOriginState(origin);
+      const runtime = getOriginRuntime(origin);
       const originTools = allTools.filter((tool) => tool.origin === origin);
 
       if (originTools.length === 0) {
-        runtime.state = 'degraded';
-        runtime.reason = 'Embedded origin reported no tools.';
+        if (runtime.state.state !== 'revoked' && runtime.state.state !== 'revoking') {
+          moveOrigin(runtime, 'evaluating', 'No tools reported on this pass.');
+          moveOrigin(runtime, 'degraded', 'Embedded origin reported no tools.');
+        }
         origins.push({
           origin,
-          state: runtime.state,
-          reason: runtime.reason,
+          state: runtime.state.state,
+          reason: runtime.state.reason,
           tools: runtime.tools
         });
         continue;
       }
+
+      runtime.changeTimestamps.push(Date.now());
+      const rateCheck = checkSurfaceChangeRateBound(runtime.changeTimestamps);
+      if (!rateCheck.ok) {
+        withdrawOriginProxies(origin);
+        moveOrigin(runtime, 'evaluating', rateCheck.message);
+        moveOrigin(runtime, 'degraded', rateCheck.message);
+        errors.push({ origin, code: rateCheck.code, message: rateCheck.message });
+        origins.push({
+          origin,
+          state: runtime.state.state,
+          reason: runtime.state.reason,
+          tools: []
+        });
+        continue;
+      }
+
+      const countCheck = checkToolCountBound(originTools.length);
+      if (!countCheck.ok) {
+        withdrawOriginProxies(origin);
+        moveOrigin(runtime, 'evaluating', countCheck.message);
+        moveOrigin(runtime, 'degraded', countCheck.message);
+        errors.push({ origin, code: countCheck.code, message: countCheck.message });
+        origins.push({
+          origin,
+          state: runtime.state.state,
+          reason: runtime.state.reason,
+          tools: []
+        });
+        continue;
+      }
+
+      moveOrigin(runtime, 'evaluating', 'Evaluating widget tools.');
 
       const screen = screenOrigin({
         manifest,
@@ -265,14 +328,12 @@ export async function aggregateOnce() {
 
       if (!screen.ok) {
         withdrawOriginProxies(origin);
-        runtime.state = 'quarantined';
-        runtime.reason = screen.reason;
-        runtime.tools = [];
+        moveOrigin(runtime, 'quarantined', screen.reason);
         errors.push({ origin, code: screen.code, message: screen.reason });
         origins.push({
           origin,
-          state: runtime.state,
-          reason: runtime.reason,
+          state: runtime.state.state,
+          reason: runtime.state.reason,
           tools: []
         });
         continue;
@@ -291,16 +352,16 @@ export async function aggregateOnce() {
       }
 
       runtime.tools = proxyNames;
-      runtime.state = proxyNames.length > 0 ? 'active' : 'degraded';
-      runtime.reason =
-        proxyNames.length > 0
-          ? 'Proxies registered on the governed surface.'
-          : 'No proxies could be registered.';
+      if (proxyNames.length > 0) {
+        moveOrigin(runtime, 'active', 'Proxies registered on the governed surface.');
+      } else {
+        moveOrigin(runtime, 'degraded', 'No proxies could be registered.');
+      }
 
       origins.push({
         origin,
-        state: runtime.state,
-        reason: runtime.reason,
+        state: runtime.state.state,
+        reason: runtime.state.reason,
         tools: proxyNames
       });
     }
@@ -341,11 +402,15 @@ export function getRegisteredProxyNames() {
   return [...registeredProxies.keys()];
 }
 
+export function getOriginRuntimeForTests(origin) {
+  return originRuntime.get(origin);
+}
+
 export function resetAggregatorForTests() {
   for (const name of [...registeredProxies.keys()]) {
     withdrawProxy(name);
   }
-  originStates.clear();
+  originRuntime.clear();
   instanceRegistry.clear();
   manifestCache = null;
   passInFlight = false;

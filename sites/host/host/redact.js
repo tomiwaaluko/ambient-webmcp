@@ -26,7 +26,9 @@ export function redact(text) {
 
   for (const pattern of PATTERN_SETS['credential-or-payment']) {
     pattern.regex.lastIndex = 0;
-    const matches = output.match(new RegExp(pattern.regex.source, pattern.regex.flags.includes('g') ? pattern.regex.flags : `${pattern.regex.flags}g`));
+    const flags = pattern.regex.flags.includes('g') ? pattern.regex.flags : `${pattern.regex.flags}g`;
+    const globalRe = new RegExp(pattern.regex.source, flags);
+    const matches = output.match(globalRe);
     if (!matches || matches.length === 0) continue;
 
     counts.set(pattern.source, (counts.get(pattern.source) ?? 0) + matches.length);
