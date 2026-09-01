@@ -105,7 +105,7 @@ window.addEventListener('message', (event) => {
  * @param {object} opts
  * @param {'acme'|'northwind'|'zenith'} [opts.site]
  * @param {string} [opts.src]              explicit src, overrides site
- * @param {'grant'|'omit'|'wrong'} [opts.allow]  leg 1
+ * @param {'grant'|'bare'|'omit'|'wrong'} [opts.allow]  leg 1
  * @param {'host'|'none'|'wrong'} [opts.exposed] leg 2, forwarded to the widget
  * @param {number|null} [opts.late]
  * @returns {Promise<{ frame: HTMLIFrameElement, origin: string, ready: object|null }>}
@@ -123,6 +123,7 @@ async function mount({ site = 'acme', src = null, allow = 'grant', exposed = 'ho
   // Order matters for a dynamically-created frame: the container policy must be
   // set before src, or the frame's document loads without the grant.
   if (allow === 'grant') frame.allow = `tools ${origin}`;
+  else if (allow === 'bare') frame.allow = 'tools'; // the spec's own example form
   else if (allow === 'wrong') frame.allow = `tools ${ORIGINS.zenith}`;
   // allow === 'omit' -> attribute never set; `tools` then defaults to 'self',
   // which excludes a cross-origin child.
@@ -199,9 +200,13 @@ function reset() {
   logEl.textContent = 'reset';
 }
 
-/** Register a host-owned tool, so Q5 can compare host tools against widget tools. */
-function registerHostTool(name = 'host_marker') {
-  document.modelContext.registerTool({
+/**
+ * Register a host-owned tool, so Q5 can compare host tools against widget
+ * tools. registerTool returns a promise; awaiting it is what keeps a failed
+ * registration from disappearing.
+ */
+async function registerHostTool(name = 'host_marker') {
+  await document.modelContext.registerTool({
     name,
     description: 'Host-owned marker tool. Present so the spike can tell host tools from widget tools.',
     inputSchema: { type: 'object', properties: {} },

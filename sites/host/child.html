@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Host — same-origin child frame</title>
+
+<!-- Same origin as the host document, so this page carries the host's token.
+     Its purpose is to be a control: if the host cannot see this frame's tools
+     either, the blocker is frame aggregation in general rather than anything
+     specific to crossing an origin. -->
+<meta http-equiv="origin-trial" content="AmAebnj3Dor43RsIpYcXYDI2h5qIADVBB1QaJPuxNSZJiaMn29Xs9Eos1cWt13c1PtUJ8t2u4JIhMcaYFrfWRQ8AAABteyJvcmlnaW4iOiJodHRwczovL2FtYmllbnQtaG9zdC10b21pd2FhbHVrb3MtcHJvamVjdHMudmVyY2VsLmFwcDo0NDMiLCJmZWF0dXJlIjoiV2ViTUNQIiwiZXhwaXJ5IjoxNzk0ODczNjAwfQ==">
+
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 13px/1.5 system-ui, sans-serif; margin: 0; padding: .75rem; }
+  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .5rem;
+        border-radius: 4px; font-size: 12px; margin: .25rem 0 0; }
+</style>
+</head>
+<body>
+  <strong>Host same-origin child</strong>
+  <pre id="out">…</pre>
+
+<script type="module">
+const params = new URLSearchParams(location.search);
+const exposedMode = params.get('exposed') ?? 'host';
+const HOST_ORIGIN = 'https://ambient-host-tomiwaalukos-projects.vercel.app';
+
+const diagnostics = {
+  origin: location.origin,
+  exposedMode,
+  hasModelContext: typeof document.modelContext !== 'undefined',
+  isFramed: window.top !== window.self,
+  registered: [],
+  errors: []
+};
+
+if (diagnostics.hasModelContext) {
+  const options = exposedMode === 'none' ? {} : { exposedTo: [HOST_ORIGIN] };
+  try {
+    await document.modelContext.registerTool({
+      name: 'host_child_tool',
+      description: 'Same-origin child frame tool.',
+      inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+      annotations: { readOnlyHint: true },
+      async execute(input) {
+        return { content: [{ type: 'text', text: `host_child_tool got ${JSON.stringify(input ?? null)}` }] };
+      }
+    }, options);
+    diagnostics.registered.push('host_child_tool');
+  } catch (cause) {
+    diagnostics.errors.push(`${cause && cause.name}: ${cause && cause.message}`);
+  }
+}
+
+document.getElementById('out').textContent = JSON.stringify(diagnostics, null, 2);
+if (window.top !== window.self) {
+  parent.postMessage({ source: 'ambient-spike-widget', type: 'ready', diagnostics }, '*');
+}
+</script>
+</body>
+</html>

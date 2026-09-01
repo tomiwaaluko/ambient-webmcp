@@ -71,8 +71,7 @@ const diagnostics = {
 };
 
 function buildDescriptor(name, description, extra = {}) {
-  const exposedTo = exposedToFor(exposedMode);
-  const descriptor = {
+  return {
     name,
     description,
     inputSchema: {
@@ -89,15 +88,24 @@ function buildDescriptor(name, description, extra = {}) {
     },
     ...extra
   };
-  if (exposedTo) descriptor.exposedTo = exposedTo;
-  return descriptor;
 }
 
-function register(name, description, extra) {
+/**
+ * `exposedTo` belongs in registerTool's SECOND argument, not in the tool
+ * descriptor. Put it in the descriptor and it is an unrecognised dictionary
+ * member: silently dropped, tool registers, host sees nothing, no error
+ * anywhere. registerTool also returns a promise, so a registration that is not
+ * awaited loses its own rejection.
+ */
+async function register(name, description, extra) {
+  const options = {};
+  const exposedTo = exposedToFor(exposedMode);
+  if (exposedTo) options.exposedTo = exposedTo;
+
   try {
-    document.modelContext.registerTool(buildDescriptor(name, description, extra));
+    await document.modelContext.registerTool(buildDescriptor(name, description, extra), options);
     diagnostics.registered.push(name);
-    note(`registered ${name} (exposedTo=${exposedMode})`);
+    note(`registered ${name} (exposedTo=${exposedMode}: ${JSON.stringify(exposedTo ?? null)})`);
     return true;
   } catch (cause) {
     const text = `${cause && cause.name}: ${cause && cause.message}`;
@@ -110,15 +118,15 @@ function register(name, description, extra) {
 if (!diagnostics.hasModelContext) {
   note('document.modelContext is undefined — WebMCP unavailable on this origin.');
 } else {
-  register('acme_search', 'Search Acme Booking inventory.');
+  await register('acme_search', 'Search Acme Booking inventory.');
 }
 
 // The toolchange probe (spike Q4): register a *second* tool later, well after
 // the host has finished its first aggregation pass, and see whether the
 // embedder's document hears about it.
 if (lateMs !== null && diagnostics.hasModelContext) {
-  setTimeout(() => {
-    register('acme_late', 'Registered after first paint, to test embedder toolchange.');
+  setTimeout(async () => {
+    await register('acme_late', 'Registered after first paint, to test embedder toolchange.');
     postToParent('late-registered');
   }, lateMs);
 }
@@ -136,7 +144,7 @@ window.addEventListener('message', async (event) => {
 
   if (data.cmd === 'register-late') {
     const name = data.name || `acme_late_${Date.now()}`;
-    const ok = register(name, 'Late tool registered on host command.');
+    const ok = await register(name, 'Late tool registered on host command.');
     postToParent('cmd-result', { cmd: data.cmd, ok, name, replyTo: data.replyTo });
     return;
   }
