@@ -1,0 +1,338 @@
+{
+  "manifestVersion": 1,
+  "contract": "CONTRACT.md",
+  "description": "Machine-readable form of CONTRACT.md. Every rule here has the same id and the same statement text as the contract prose; test/contract-manifest.test.js asserts both directions, because a checker reporting a rule the contract does not state makes the checker's output a lie.",
+  "evidenceClasses": ["mechanical", "attested", "observed"],
+  "notes": {
+    "roles": "role is 'widget' or 'host'. The CLI gate (U4) evaluates a widget subject; the in-page inspector (U12) evaluates the host's own proxy surface. A rule whose role does not match the subject is not-evaluable, never a pass.",
+    "predicates": "Every predicate is { check, params }. 'attestation-claim' reads the widget's attestation and the result carries evidence 'attested'. 'harness-probe' requires an execution harness and is not-evaluable without one. Pattern sets are named, not inlined — src/shared/patterns.js (PRO-9) owns the expressions.",
+    "attestationClaims": "The claim keys referenced below define the shape of the attestation document a widget supplies under W8: exposedToScoped, untrustedContentMarked, authorizationEnforced, noSensitiveValues."
+  },
+  "reasonCodes": [
+    "ORIGIN_NOT_ALLOWLISTED",
+    "NAME_TOO_LONG",
+    "NAME_ILLEGAL_CHARS",
+    "INSTANCE_LIMIT_REACHED",
+    "INJECTION_PATTERN_MATCH",
+    "BOUND_EXCEEDED_TOOL_COUNT",
+    "EXECUTION_TIMEOUT",
+    "RESULT_AFTER_REVOCATION",
+    "INPUT_SCHEMA_PARSE_FAILED",
+    "TOOL_HANDLE_INVALID",
+    "MODEL_CONTEXT_UNAVAILABLE",
+    "INPUT_SHAPE_UNSUPPORTED",
+    "RESULT_PARSE_FAILED"
+  ],
+  "rules": [
+    {
+      "id": "W1",
+      "role": "widget",
+      "title": "Widget identity is declared, vendor identity is assigned",
+      "statement": "Declare your widget identifier only; the host assigns the vendor label. A label a widget can assert is one it can forge, capturing or erasing a rival's tool.",
+      "evidence": "mechanical",
+      "requirements": ["R4"],
+      "predicate": {
+        "check": "tool-name-segments",
+        "params": { "separator": ".", "maxSegments": 2 }
+      },
+      "note": "A registered name of three or more dot-separated segments occupies the vendor segment the host owns. This is a necessary condition, not proof that a widget is not impersonating anyone — the protection against impersonation is H1, where the label comes from the allowlist and the widget's own claim is never read."
+    },
+    {
+      "id": "W2",
+      "role": "widget",
+      "title": "Exposure is scoped to real embedders",
+      "statement": "Restrict `exposedTo` to the host origins that actually embed you. A wildcard hands your capability to any page willing to frame you.",
+      "evidence": "attested",
+      "requirements": ["R5"],
+      "predicate": {
+        "check": "attestation-claim",
+        "params": { "claim": "exposedToScoped" }
+      },
+      "note": "Not mechanical: the descriptor returned by getTools() carries no exposedTo member (spike Q1). The surface proves only that the caller's own origin was included, never that no wildcard was used."
+    },
+    {
+      "id": "W3",
+      "role": "widget",
+      "title": "Content you did not author is marked",
+      "statement": "Mark every tool returning content you did not author with `untrustedContentHint`. Unmarked, another party's text reaches the agent looking like yours.",
+      "evidence": "attested",
+      "requirements": ["R6", "R37"],
+      "predicate": {
+        "check": "attestation-claim",
+        "params": { "claim": "untrustedContentMarked" }
+      },
+      "note": "The annotation's value is mechanically readable; whether the returned content is self-authored is not. Only the vendor knows, so only the vendor can attest."
+    },
+    {
+      "id": "W4",
+      "role": "widget",
+      "title": "Mutating tools declare themselves mutating",
+      "statement": "Declare `readOnlyHint` truthfully — anything that mutates state, sends a message, or moves money is mutating. A false read-only claim is a side effect nobody was asked to confirm.",
+      "evidence": "observed",
+      "requirements": ["R7", "R22"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "readOnlyContradiction" }
+      },
+      "note": "Not-evaluable without a harness. Ambient claims contradiction detection against instrumented reference widgets whose state changes the harness can see, not generic false-read-only detection for arbitrary widgets."
+    },
+    {
+      "id": "W5",
+      "role": "widget",
+      "title": "Minimal input, no passthrough",
+      "statement": "Accept only the parameters the tool needs, never a free-form context or passthrough field, which is an open channel into your execution path.",
+      "evidence": "mechanical",
+      "requirements": ["R8"],
+      "predicate": {
+        "check": "input-schema-shape",
+        "params": {
+          "requireDeclaredProperties": true,
+          "forbidAdditionalProperties": true,
+          "forbidUnconstrainedStringNames": ["context", "passthrough", "payload", "raw", "extra", "freeform"],
+          "reasonCode": "INPUT_SCHEMA_PARSE_FAILED"
+        }
+      },
+      "note": "inputSchema arrives from getTools() as a JSON string and must be parsed before evaluation (spike Q1). The name list is a heuristic over unconstrained string properties, not an exhaustive one."
+    },
+    {
+      "id": "W6",
+      "role": "widget",
+      "title": "Descriptions state capability, not instructions",
+      "statement": "Describe capability and nothing else; carry no instruction addressed to the agent, because a description is text the model reads, not a caption it ignores.",
+      "evidence": "mechanical",
+      "requirements": ["R9", "R23"],
+      "predicate": {
+        "check": "text-pattern-absent",
+        "params": { "fields": ["description", "title", "paramDescription", "enumValue"], "patternSet": "agent-directed-instruction" }
+      },
+      "note": "Detection over known shapes. A benign instruction-like description must not fail this rule (R23), and an unrecognized attack shape will pass it."
+    },
+    {
+      "id": "W7",
+      "role": "widget",
+      "title": "Surface changes are announced",
+      "statement": "Notify your host when your own tool surface changes, so it does not depend on cross-origin event propagation to learn that it did.",
+      "evidence": "observed",
+      "requirements": ["R10"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "surfaceChangeNotification" }
+      }
+    },
+    {
+      "id": "W8",
+      "role": "widget",
+      "title": "An attestation exists and is complete",
+      "statement": "Supply a machine-readable attestation covering every obligation the registered surface cannot reveal; without one, those obligations are unevaluated rather than passed.",
+      "evidence": "mechanical",
+      "requirements": ["R37"],
+      "predicate": {
+        "check": "attestation-present",
+        "params": { "mustCoverEvidence": "attested" }
+      },
+      "note": "Mechanical because presence and shape are verifiable; the claims inside it are not, which is why each attested rule is reported separately as resting on the vendor's word."
+    },
+    {
+      "id": "W9",
+      "role": "widget",
+      "title": "Authorization is enforced where state changes",
+      "statement": "Confirm with the user and honor the session's existing permissions before any side effect, because the arrival of a tool call is not authorization.",
+      "evidence": "attested",
+      "requirements": ["R38"],
+      "predicate": {
+        "check": "attestation-claim",
+        "params": { "claim": "authorizationEnforced" }
+      }
+    },
+    {
+      "id": "W10",
+      "role": "widget",
+      "title": "No credentials, secrets, or payment instruments",
+      "statement": "Neither accept nor return credentials, secrets, tokens, or payment instrument numbers. A secret in a tool result is a secret in the agent's transcript.",
+      "evidence": "attested",
+      "requirements": ["R53"],
+      "predicate": {
+        "check": "attestation-claim",
+        "params": { "claim": "noSensitiveValues" }
+      },
+      "note": "The accept half is partly screenable through W5's schema check; the return half is not knowable from the surface, so the rule as a whole is attested rather than mechanical. H12 is the host's independent redaction layer over the same shapes."
+    },
+    {
+      "id": "H1",
+      "role": "host",
+      "title": "Allowlist admits, and the allowlist names the vendor",
+      "statement": "Admit tools only from allowlisted origins and take each vendor label from that entry, never from the widget — origin is the one identifier a widget cannot assert.",
+      "evidence": "mechanical",
+      "requirements": ["R11"],
+      "predicate": {
+        "check": "origin-allowlisted",
+        "params": { "labelSource": "allowlist", "reasonCode": "ORIGIN_NOT_ALLOWLISTED" }
+      }
+    },
+    {
+      "id": "H2",
+      "role": "host",
+      "title": "Names are composed, validated, and refused rather than coerced",
+      "statement": "Name every federated tool `vendor.widget.verb`, and refuse a name that collides, exceeds 128 characters, or carries an illegal character rather than truncating it into one that misattributes its own call.",
+      "evidence": "mechanical",
+      "requirements": ["R12", "R20"],
+      "predicate": {
+        "check": "composed-name-valid",
+        "params": {
+          "segments": ["vendor", "widget", "verb"],
+          "separator": ".",
+          "maxLength": 128,
+          "charset": "A-Za-z0-9_-",
+          "reasonCodes": ["NAME_TOO_LONG", "NAME_ILLEGAL_CHARS"]
+        }
+      },
+      "note": "`.` is the separator because tool names permit only ASCII alphanumerics plus `_`, `-`, and `.`, and `.` is the one absent from every official Chrome example."
+    },
+    {
+      "id": "H3",
+      "role": "host",
+      "title": "Agent-visible text is rebuilt, never passed through",
+      "statement": "Rebuild every widget-supplied string an agent will see — descriptions, parameter descriptions, enum values, results — into a host-authored envelope naming the contributing origin; passed through unchanged, vendor text is indistinguishable from yours.",
+      "evidence": "mechanical",
+      "requirements": ["R13"],
+      "predicate": {
+        "check": "envelope-shape",
+        "params": {
+          "kinds": ["description", "paramDescription", "enumValue", "result"],
+          "mustCarry": ["origin", "thirdPartyDelimiters"]
+        }
+      }
+    },
+    {
+      "id": "H4",
+      "role": "host",
+      "title": "Agent-directed instructions quarantine the origin",
+      "statement": "Detect agent-directed instructions in widget text and quarantine the origin on a match — filtering that lowers exposure, not a guarantee of containment.",
+      "evidence": "mechanical",
+      "requirements": ["R14"],
+      "predicate": {
+        "check": "text-pattern-absent",
+        "params": {
+          "fields": ["description", "paramDescription", "enumValue", "result"],
+          "patternSet": "agent-directed-instruction",
+          "reasonCode": "INJECTION_PATTERN_MATCH"
+        }
+      },
+      "note": "Evaluated over the host's published surface rather than as a behavioral probe: matched text still present on that surface means the origin was not quarantined. A shape the pattern set does not recognize passes, which is why the limits section calls this filtering rather than containment."
+    },
+    {
+      "id": "H5",
+      "role": "host",
+      "title": "Quarantine is per-origin, retroactive, and re-checked every pass",
+      "statement": "Quarantine by origin and retroactively, withdrawing proxies already registered, and re-evaluate every admitted widget on every pass, because a widget can turn hostile after it loads.",
+      "evidence": "observed",
+      "requirements": ["R15", "R16"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "retroactiveQuarantine" }
+      }
+    },
+    {
+      "id": "H6",
+      "role": "host",
+      "title": "The mutating annotation is never weakened",
+      "statement": "Carry a widget's mutating annotation through unchanged and never present it as read-only, since that annotation is the agent's only cue to ask first.",
+      "evidence": "mechanical",
+      "requirements": ["R39"],
+      "predicate": {
+        "check": "annotation-preserved",
+        "params": { "annotation": "readOnlyHint", "direction": "never-weaken" }
+      },
+      "note": "The platform spelling of the plan's untrustedContent is untrustedContentHint; both annotations are carried, and neither is weakened."
+    },
+    {
+      "id": "H7",
+      "role": "host",
+      "title": "One instance per identity, refused visibly",
+      "statement": "Federate one instance per vendor and widget identity and refuse the second visibly, naming the limit — dropped silently it is indistinguishable from a widget that failed to load.",
+      "evidence": "observed",
+      "requirements": ["R40"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "instanceLimit", "reasonCode": "INSTANCE_LIMIT_REACHED" }
+      }
+    },
+    {
+      "id": "H8",
+      "role": "host",
+      "title": "Revocation withdraws the grant, not just the proxy",
+      "statement": "Revoke by withdrawing the origin's `tools` Permissions Policy grant rather than by dropping the proxy alone, which would leave the widget still able to register.",
+      "evidence": "observed",
+      "requirements": ["R17"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "permissionsPolicyRevocation" }
+      }
+    },
+    {
+      "id": "H9",
+      "role": "host",
+      "title": "The surface stays current and passes do not recurse",
+      "statement": "Keep the surface current as widgets register and unregister, and serialize overlapping aggregation passes so a pass triggered by your own proxy registrations cannot recurse.",
+      "evidence": "observed",
+      "requirements": ["R18"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "aggregationPassSerialized" }
+      },
+      "note": "toolchange fires for cross-origin children and is correctly scoped, but carries no payload, so re-aggregation is whole-surface and debounced (spike Q4)."
+    },
+    {
+      "id": "H10",
+      "role": "host",
+      "title": "Failures are envelopes, and late results are discarded",
+      "statement": "Return a structured failure envelope naming the cause when a proxied tool is unavailable, errors, or exceeds its timeout, and discard a result arriving after timeout or revocation rather than forwarding it.",
+      "evidence": "observed",
+      "requirements": ["R19"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": {
+          "probe": "failureEnvelope",
+          "reasonCodes": [
+            "EXECUTION_TIMEOUT",
+            "RESULT_AFTER_REVOCATION",
+            "TOOL_HANDLE_INVALID",
+            "MODEL_CONTEXT_UNAVAILABLE",
+            "INPUT_SHAPE_UNSUPPORTED",
+            "RESULT_PARSE_FAILED"
+          ]
+        }
+      },
+      "note": "Discarding a late result is not cancellation. The side effect may already have occurred; the inspector reports the race rather than claiming the call was stopped."
+    },
+    {
+      "id": "H11",
+      "role": "host",
+      "title": "Bounds are named when breached, never silently applied",
+      "statement": "Bound what one origin may consume — tool count, metadata size, result size, concurrent executions, change rate — and name the breached bound, because silent truncation makes an over-budget widget look conformant.",
+      "evidence": "observed",
+      "requirements": ["R47", "R48", "R49", "R50", "R51", "R52"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": {
+          "probe": "resourceBounds",
+          "bounds": ["toolCount", "metadataSize", "resultSize", "concurrentExecutions", "surfaceChangeRate"],
+          "reasonCode": "BOUND_EXCEEDED_TOOL_COUNT"
+        }
+      }
+    },
+    {
+      "id": "H12",
+      "role": "host",
+      "title": "Sensitive shapes are redacted and logs stay in the session",
+      "statement": "Redact credential-, token-, and payment-shaped strings before they reach an envelope or a log, and keep logs in memory for the session alone; a log is a second copy of everything that passed through.",
+      "evidence": "observed",
+      "requirements": ["R55", "R56"],
+      "predicate": {
+        "check": "harness-probe",
+        "params": { "probe": "redactionAndLogScope" }
+      },
+      "note": "Redaction alone is verifiable from an envelope, but non-persistence across reloads and non-transmission off the host origin are only visible by running the host, so the rule as a whole is observed."
+    }
+  ]
+}

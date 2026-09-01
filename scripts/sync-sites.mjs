@@ -28,6 +28,8 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SHARED_DIR = join(REPO_ROOT, 'src', 'shared');
 const WIDGET_DIR = join(REPO_ROOT, 'src', 'widget');
+const HOST_DIR = join(REPO_ROOT, 'src', 'host');
+const CHECKER_DIR = join(REPO_ROOT, 'src', 'checker');
 const SITES_DIR = join(REPO_ROOT, 'sites');
 
 /** Sites that receive a copy of `src/shared`. */
@@ -69,6 +71,39 @@ const WIDGET_BANNER = [
   ''
 ].join('\n');
 
+const HOST_BANNER = [
+  '// GENERATED FILE - DO NOT EDIT.',
+  '// Copied from src/host/ by scripts/sync-sites.mjs (import paths adjusted for deployment).',
+  '// Edit the source in src/host/ and re-run: node scripts/sync-sites.mjs',
+  ''
+].join('\n');
+
+const ENGINE_BANNER = [
+  '// GENERATED FILE - DO NOT EDIT.',
+  '// Copied from src/checker/engine.js by scripts/sync-sites.mjs (import paths adjusted).',
+  '// Edit the source in src/checker/engine.js and re-run: node scripts/sync-sites.mjs',
+  ''
+].join('\n');
+
+/**
+ * @param {string} source
+ * @returns {string}
+ */
+function rewriteHostModuleImports(source) {
+  return source
+    .replaceAll("from '../shared/", "from '../vendor/")
+    .replaceAll("from '../checker/engine.js'", "from '../vendor/engine.js'")
+    .replaceAll("from '../../sites/host/allowlist.js'", "from '../allowlist.js'");
+}
+
+/**
+ * @param {string} source
+ * @returns {string}
+ */
+function rewriteEngineImports(source) {
+  return source.replaceAll("from '../shared/patterns.js'", "from './patterns.js'");
+}
+
 /**
  * @returns {Promise<string[]>} names of the `.js` files in `src/shared`
  */
@@ -88,6 +123,15 @@ async function widgetFiles() {
 }
 
 /**
+ * @returns {Promise<string[]>}
+ */
+async function hostFiles() {
+  if (!existsSync(HOST_DIR)) return [];
+  const entries = await readdir(HOST_DIR, { withFileTypes: true });
+  return entries.filter((e) => e.isFile() && e.name.endsWith('.js')).map((e) => e.name);
+}
+
+/**
  * @param {object} opts
  * @param {boolean} opts.check
  * @param {string[]} opts.stale
@@ -95,10 +139,12 @@ async function widgetFiles() {
  * @param {string} opts.sourcePath
  * @param {string} opts.targetPath
  * @param {string} opts.banner
+ * @param {(source: string) => string} [opts.transform]
  */
-async function syncOneFile({ check, stale, stats, sourcePath, targetPath, banner }) {
-  const source = await readFile(sourcePath, 'utf8');
-  const desired = banner + source;
+async function syncOneFile({ check, stale, stats, sourcePath, targetPath, banner, transform }) {
+  const raw = await readFile(sourcePath, 'utf8');
+  const body = transform ? transform(raw) : raw;
+  const desired = banner + body;
   const current = existsSync(targetPath) ? await readFile(targetPath, 'utf8') : null;
 
   if (current === desired) return;
@@ -118,6 +164,7 @@ async function main() {
   const check = process.argv.includes('--check');
   const shared = await sharedFiles();
   const widget = await widgetFiles();
+  const host = await hostFiles();
 
   if (shared.length === 0) {
     console.error('sync-sites: no .js files found in src/shared/ - nothing to copy.');
@@ -137,6 +184,7 @@ async function main() {
     const sharedNames = sharedForSite(site, shared);
     const allowedVendorFiles = new Set([
       ...sharedNames,
+      ...(site === 'host' ? ['engine.js', 'manifest.json'] : []),
       ...(WIDGET_SITES.includes(site) ? widget : [])
     ]);
 
@@ -160,6 +208,54 @@ async function main() {
         targetPath: join(vendorDir, name),
         banner: SHARED_BANNER
       });
+    }
+
+    if (site === 'host') {
+      const hostOutDir = join(siteDir, 'host');
+      if (existsSync(hostOutDir)) {
+        for (const entry of await readdir(hostOutDir)) {
+          if (entry.endsWith('.js') && !host.includes(entry)) {
+            if (check) stale.push(`${relative(REPO_ROOT, join(hostOutDir, entry))} (orphaned)`);
+            else await rm(join(hostOutDir, entry));
+          }
+        }
+      }
+
+      for (const name of host) {
+        await syncOneFile({
+          check,
+          stale,
+          stats,
+          sourcePath: join(HOST_DIR, name),
+          targetPath: join(hostOutDir, name),
+          banner: HOST_BANNER,
+          transform: rewriteHostModuleImports
+        });
+      }
+
+      await syncOneFile({
+        check,
+        stale,
+        stats,
+        sourcePath: join(CHECKER_DIR, 'engine.js'),
+        targetPath: join(vendorDir, 'engine.js'),
+        banner: ENGINE_BANNER,
+        transform: rewriteEngineImports
+      });
+
+      const manifestSource = join(REPO_ROOT, 'rules', 'manifest.json');
+      const manifestTarget = join(vendorDir, 'manifest.json');
+      const manifestRaw = await readFile(manifestSource, 'utf8');
+      const manifestCurrent = existsSync(manifestTarget) ? await readFile(manifestTarget, 'utf8') : null;
+      if (manifestCurrent !== manifestRaw) {
+        if (check) {
+          stale.push(`${relative(REPO_ROOT, manifestTarget)} (${manifestCurrent === null ? 'missing' : 'stale'})`);
+        } else {
+          await writeFile(manifestTarget, manifestRaw, 'utf8');
+          stats.written += 1;
+          console.log(`sync-sites: wrote ${relative(REPO_ROOT, manifestTarget)}`);
+        }
+      }
     }
   }
 
@@ -192,8 +288,9 @@ async function main() {
     }
     const sharedCount = SITES.reduce((n, site) => n + sharedForSite(site, shared).length, 0);
     const widgetCount = widget.length * WIDGET_SITES.length;
+    const hostCount = host.length + 2;
     console.log(
-      `sync-sites --check: all ${sharedCount + widgetCount} vendored copies are current.`
+      `sync-sites --check: all ${sharedCount + widgetCount + hostCount} vendored copies are current.`
     );
     return;
   }

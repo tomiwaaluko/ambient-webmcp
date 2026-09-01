@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT.
-// Copied verbatim from src/shared/ by scripts/sync-sites.mjs.
-// Edit the source in src/shared/ and re-run: node scripts/sync-sites.mjs
+// Copied from src/host/ by scripts/sync-sites.mjs (import paths adjusted for deployment).
+// Edit the source in src/host/ and re-run: node scripts/sync-sites.mjs
 /**
  * Skeletal federation inspector — PRO-16 replaces this with full lifecycle UI.
  *
