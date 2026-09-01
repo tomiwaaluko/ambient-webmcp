@@ -38,10 +38,10 @@ All four Vercel projects are live and serving production from `main` (root direc
 
 | Role | Origin | Vercel project | Root dir | Token |
 |---|---|---|---|---|
-| host | `https://ambient-host-tomiwaalukos-projects.vercel.app` | `ambient-host` | `sites/host` | ☐ not minted |
-| acme | `https://acme-booking-tomiwaalukos-projects.vercel.app` | `acme-booking` | `sites/acme-booking` | ☐ not minted |
-| northwind | `https://northwind-checkout-tomiwaalukos-projects.vercel.app` | `northwind-checkout` | `sites/northwind-checkout` | ☐ not minted |
-| zenith | `https://zenith-support-tomiwaalukos-projects.vercel.app` | `zenith-support` | `sites/zenith-support` | ☐ not minted |
+| host | `https://ambient-host-tomiwaalukos-projects.vercel.app` | `ambient-host` | `sites/host` | ☑ minted, live, expires 2026-11-17 |
+| acme | `https://acme-booking-tomiwaalukos-projects.vercel.app` | `acme-booking` | `sites/acme-booking` | ☑ minted, live, expires 2026-11-17 |
+| northwind | `https://northwind-checkout-tomiwaalukos-projects.vercel.app` | `northwind-checkout` | `sites/northwind-checkout` | ☑ minted, live, expires 2026-11-17 |
+| zenith | `https://zenith-support-tomiwaalukos-projects.vercel.app` | `zenith-support` | `sites/zenith-support` | ☑ minted, live, expires 2026-11-17 |
 
 ⚠️ **The short `<name>.vercel.app` form does not work for three of the four.** Those names were already taken globally, so Vercel assigned arbitrary suffixes (`-theta`, `-xi`, `-six`) — inconsistent, and only `northwind-checkout.vercel.app` got the clean form. The team-suffixed form above is the one that exists for all four, so it is canonical. Do not use the short form anywhere.
 
