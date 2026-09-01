@@ -1,0 +1,11 @@
+{
+  "name": "ambient-webmcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Conformance contract and reference implementation for federated WebMCP tool publication.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

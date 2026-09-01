@@ -76,7 +76,9 @@ executeToolCompat(tool, input) // handles object-vs-JSON-string, caches winner
 
 ## Testing
 
-- `node --test test/`. Files are `test/<module>.test.js`.
+- **Run `npm test`** (equivalently, bare `node --test`). Files are `test/<module>.test.js`.
+- ⚠️ **Do not run `node --test test/`.** Passing the directory as an argument fails with `MODULE_NOT_FOUND` on Node 24 + Windows — verified on v24.13.0 in both PowerShell and Git Bash. Bare `node --test` auto-discovers and works on every platform, so it is the canonical form. Earlier ticket text may still show the directory-argument version; it is wrong.
+- `package.json` exists **only** to set `"type": "module"` (without it, `import`/`export` in `.js` files fail) and to alias the test command. It has no `dependencies` and no `devDependencies`, and that is not an oversight — see hard constraint 2.
 - Test behavior, not implementation. A test asserting a function was called is not a test.
 - Pure-logic modules get real coverage. Browser modules get what is testable without a browser; the rest is verified manually and stated in the PR.
 - **Never assert a passing result the code did not actually earn** — especially evidence classes in the checker. A test that lets `attested` masquerade as `observed` defeats the entire three-class design.

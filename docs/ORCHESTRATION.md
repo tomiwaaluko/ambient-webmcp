@@ -172,7 +172,7 @@ Total estimate is **42 points against three days.** That is an overcommit by des
 - Merge to `main` in dependency order; rebase on current `main` before review.
 - PRO-8 as 2–4 stacked PRs by phase, merged in phase order.
 - A vendor origin deployed without a passing `node src/checker/cli.js` run is a process failure, not a shortcut.
-- No CI exists as of 2026-08-31. `node --test test/` plus the checker CLI are the gate. If CI is added, it must be green first.
+- No CI exists as of 2026-08-31. **`npm test`** plus the checker CLI are the gate. If CI is added, it must be green first. (Use `npm test` / bare `node --test` — `node --test test/` fails with `MODULE_NOT_FOUND` on Node 24 + Windows.)
 
 ## Checkpoints and cut triggers
 

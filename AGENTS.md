@@ -22,7 +22,8 @@ Several agents across several harnesses are building this in parallel over three
 2. **Never overclaim.** Ambient does **not** prevent prompt injection, does **not** do generic false-read-only detection, and **cannot** cancel an in-flight side effect. This binds identifiers and comments, not just prose. Do not name something `sanitize`, `prevent`, or `secure` when the mechanism is filtering or labeling.
 3. **Never fail silently.** Every refusal carries a distinct reason code. Never truncate silently.
 4. **The plan wins.** If your ticket contradicts the plan, surface it — do not guess, and do not resolve it by editing the plan.
-5. **Do not merge your own PR.** Self-review your diff line by line, run `node --test test/`, paste the output into the PR description. No CI exists as of 2026-08-31; if one has been added it must be green first.
+5. **Do not merge your own PR.** Self-review your diff line by line, run **`npm test`**, paste the output into the PR description. No CI exists as of 2026-08-31; if one has been added it must be green first.
+   - ⚠️ **`npm test` (bare `node --test`) is the correct command.** Do **not** run `node --test test/` — the directory argument fails with `MODULE_NOT_FOUND` on Node 24 + Windows. Some ticket bodies still show the old form; this file overrides them.
 6. **Stay in your lane.** `docs/ORCHESTRATION.md` has a file-ownership table. Editing a path another ticket owns causes a merge conflict you will not see coming.
 
 ## One exception: the clean-room ticket
