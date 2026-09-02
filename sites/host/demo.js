@@ -35,6 +35,16 @@ export function withdrawGrantAndReset(origin) {
     .filter((part) => part !== `tools ${origin}`);
 
   iframe.setAttribute('allow', parts.join('; '));
+  iframe.addEventListener(
+    'load',
+    () => {
+      const row = document.querySelector(
+        `.inspector-origin[data-origin="${CSS.escape(origin)}"]`
+      );
+      if (row && typeof row.focus === 'function') row.focus();
+    },
+    { once: true }
+  );
   iframe.src = iframe.src;
 }
 

@@ -494,11 +494,12 @@ function restoreFocus(container) {
   const row = findOriginRow(container, pendingFocusOrigin);
   if (row && typeof row.focus === 'function') {
     row.focus();
-    // Hold focus until revoked. A mid-revoke toolchange can briefly paint
-    // `active` again; clearing on REVOKEABLE would drop pending and lose
-    // focus to document.body when the button is finally removed (R60).
+    // Keep pending through iframe grant-reset loads; those steal focus to body.
     if (row.dataset.state === 'revoked') {
-      pendingFocusOrigin = null;
+      const held = pendingFocusOrigin;
+      setTimeout(() => {
+        if (pendingFocusOrigin === held) pendingFocusOrigin = null;
+      }, 400);
     }
     return;
   }
@@ -538,6 +539,10 @@ function handleRevoke(origin, snapshot) {
   });
   if (lastContainer) {
     renderInspector(lastContainer, revokingSnapshot, lastOptions);
+    const container = lastContainer;
+    for (const delay of [0, 50, 250]) {
+      setTimeout(() => restoreFocus(container), delay);
+    }
   }
 
   runRevoke(origin, snapshot);
