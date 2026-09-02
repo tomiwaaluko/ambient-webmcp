@@ -1,0 +1,75 @@
+SETUP (you, not Codex)
+1. New Codex 5.6 Terra session. Empty folder outside this repo, e.g.
+   C:\Users\gokug\Documents\scratch-ambient-clean-room
+2. Copy ONLY CONTRACT.md into that folder. Nothing else.
+3. Paste everything below the line into Codex.
+
+----- paste from here -----
+
+You are Codex 5.6 Terra, thinking medium.
+
+PRO-17 / U13: clean-room portability. Isolation is the measurement. A compromised pass is worse than no test.
+
+ISOLATION. Stop if any of this is already false.
+- Fresh session. You have never seen Ambient aggregator source, any existing widget, the plan, AGENTS.md, CONVENTIONS.md, ORCHESTRATION.md, or any src/ from tomiwaaluko/ambient-webmcp.
+- Do not clone, open, search, or fetch that repository. Do not web-search for Ambient, WebMCP Challenge, or tomiwaaluko widgets.
+- Work only in this scratch directory. The only project file you may read is CONTRACT.md.
+- If those sources are already in context, stop. Say isolation is void. Do not implement.
+
+Two inputs only: CONTRACT.md on disk, and the helper public API in this prompt. Gaps are contract defects, not your mistakes.
+
+GOAL. Build a conformant widget from those two inputs, freeze it, then measure. Do not edit the widget to make a checker pass. If it fails, the contract has a defect.
+
+BUILD (scratch, not deployed). Tiny synthetic widget. ES modules. No bundler, no npm deps, no TypeScript. index.html plus widget.js that would call registerConformantTool. Stub document.modelContext.registerTool for Node if needed. Synthetic data only. No real PII, credentials, or payments. Widget role only. Do not implement a host aggregator.
+
+HELPER PUBLIC API (input 2, not source).
+
+registerConformantTool({ widgetId, name, description, inputSchema, readOnly, untrustedContent, exposedTo, authorize, execute }) returns Promise<void>.
+
+- widgetId: string; widget-owned id only; no vendor label; no "."
+- name: unqualified verb
+- description: string
+- inputSchema: JSON Schema object
+- readOnly: boolean
+- untrustedContent: optional boolean
+- exposedTo: non-empty array of concrete HTTPS origin strings; no wildcards
+- authorize: required when readOnly is false; returns boolean or Promise<boolean>
+- execute: (input) => result or Promise<result>
+
+Throws ConformanceRefusal with .code (SCREAMING_SNAKE) and .message. Never fail silently.
+
+Do not put exposedTo on the tool descriptor. The helper does: await document.modelContext.registerTool(descriptor, { exposedTo }). registerTool returns a Promise; await it.
+
+When readOnly is false, the helper requires authorize and wraps execute so a denied authorization does not run the vendor side effect.
+
+inputSchema must be a closed object schema with additionalProperties: false. Free-form passthrough names are refused (context, passthrough, prompt, instructions, raw, extra, and similar). A typed field such as message is allowed if the schema is closed.
+
+W8: the helper publishes attestation the checker can read:
+
+{ widgetId, origin, version: 1, attestedRules: ["W2","W3","W9","W10"], claims: { exposedToScoped, untrustedContentMarked, authorizationEnforced, noSensitiveValues } }
+
+Each claim is { statement, enforcedBy }. W4 is observed, not attested.
+
+You do not have the helper implementation. Match this API. Do not invent a second helper. Use any plausible HTTPS host origin in exposedTo.
+
+PROCESS. Do not skip or reorder.
+
+Phase A. Read CONTRACT.md. Implement. Freeze. After freeze, do not edit the widget to satisfy a checker.
+
+Phase B. You cannot run the real checker here. Stop and ask the human to copy the frozen widget to a throwaway folder, run the checker as a black box (do not read checker source), and paste the first full stdout plus exit code.
+
+Human command: node src/checker/cli.js --fixture <path-to-a-Node-subject-that-mirrors-the-widget>
+
+If --origin https://... fails, that is expected. Live HTTPS harvest needs a browser. The first --fixture output is the measurement. Do not fix the subject until it passes before that first paste.
+
+If the contract did not say how to present a Node-loadable subject, say so in the report. Produce the best subject you can from the contract, freeze it with the widget, and treat first-run fail or not-evaluable as data.
+
+Phase C. Write clean-room-report.md in this scratch directory covering: isolation conditions (Codex 5.6 Terra, thinking medium, scratch path, exact files provided, whether isolation was imperfect); unmodified first checker output; every fail or surprising not-evaluable traced to a specific CONTRACT.md sentence or omission. Do not amend CONTRACT.md in this session. List proposed amendments only.
+
+Phase D. Done. Do not open a PR. Do not merge. Hand the frozen widget and report to the human.
+
+NON-GOALS. Do not deploy. Do not fix the contract mid-run. Do not consult the plan, aggregator, or any existing widget. Do not add npm dependencies or a build step.
+
+DONE. Frozen widget in scratch; clean-room-report.md with honest isolation and first checker output (or a wait for the human paste); failures traced to contract text; no clean-pass claim if isolation was imperfect.
+
+----- paste ends -----
