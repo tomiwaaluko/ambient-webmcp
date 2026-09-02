@@ -62,11 +62,11 @@ export async function bootWidget({ onStatus } = {}) {
     untrustedContent: false,
     exposedTo: [HOST],
     execute: async (input) => {
-      const query = String(input?.query ?? '').toLowerCase();
-      const matches = catalog.filter(
-        (row) =>
-          row.destination.toLowerCase().includes(query) || row.date.includes(query)
-      );
+      const query = String(input?.query ?? '').toLowerCase().trim();
+      const matches = catalog.filter((row) => {
+        const dest = row.destination.toLowerCase();
+        return dest.includes(query) || query.includes(dest) || row.date.includes(query);
+      });
       return {
         content: [
           {
