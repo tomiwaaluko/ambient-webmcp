@@ -652,6 +652,49 @@ describe('revocation control', () => {
     assert.equal(walkFind(revokedRow, 'button', true).length, 0);
   });
 
+  test('a mid-revoke active re-render does not drop pending focus (R60)', async () => {
+    seedOriginForTests(ACME, {
+      state: 'active',
+      reason: 'Proxies registered on the governed surface.',
+      tools: ['acme.booking.search'],
+      proxyNames: ['acme.booking.search']
+    });
+
+    const container = document.createElement('div');
+    renderInspector(
+      container,
+      [
+        {
+          origin: ACME,
+          state: 'active',
+          reason: 'Proxies registered on the governed surface.',
+          tools: ['acme.booking.search']
+        }
+      ],
+      { onRevoke: () => {} }
+    );
+
+    walkFind(container, 'button', true)[0].click();
+    renderInspector(
+      container,
+      [
+        {
+          origin: ACME,
+          state: 'active',
+          reason: 'Proxies registered on the governed surface.',
+          tools: ['acme.booking.search']
+        }
+      ],
+      { onRevoke: () => {} }
+    );
+    assert.equal(document.activeElement, originRow(container, ACME));
+
+    await flush();
+    await flush();
+    assert.equal(originRow(container, ACME).dataset.state, 'revoked');
+    assert.equal(document.activeElement, originRow(container, ACME));
+  });
+
   test('missing onRevoke still runs aggregator revokeOrigin and states that PP grant is the page\'s job', async () => {
     seedOriginForTests(NORTHWIND, {
       state: 'active',

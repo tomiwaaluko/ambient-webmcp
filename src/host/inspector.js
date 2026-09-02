@@ -494,8 +494,10 @@ function restoreFocus(container) {
   const row = findOriginRow(container, pendingFocusOrigin);
   if (row && typeof row.focus === 'function') {
     row.focus();
-    // Hold focus across revoking → revoked (the button is gone; the row remains).
-    if (row.dataset.state === 'revoked' || REVOKEABLE.has(row.dataset.state)) {
+    // Hold focus until revoked. A mid-revoke toolchange can briefly paint
+    // `active` again; clearing on REVOKEABLE would drop pending and lose
+    // focus to document.body when the button is finally removed (R60).
+    if (row.dataset.state === 'revoked') {
       pendingFocusOrigin = null;
     }
     return;
