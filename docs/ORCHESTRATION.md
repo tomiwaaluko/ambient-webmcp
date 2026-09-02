@@ -51,6 +51,8 @@ A separate **third-party** token also goes in the widget helper (PRO-7) — that
 
 ✅ **Minted and proven, 2026-09-01.** Acme holds a third-party token (`isThirdParty: true`, expiry 2026-11-17), committed in `sites/acme-booking/ot-inject-3p.js`. Verified on Chrome 151: served from acme, loaded cross-origin by a northwind page carrying no token of its own, it activated WebMCP there (`modelContext` `undefined` → `object`, `registerTool` succeeded). A first-party token cannot substitute — measured. PRO-7 copies this file's shape; the token must always be served from the **vendor's** origin, since it is validated against the origin of the injecting script.
 
+**Live production, 2026-09-02 (Chrome 151).** Hobby 100-deploys/24h had blocked `main` after PR #6. After the window rolled, `a2b80d6` shipped all four production origins; host is the Lisbon demo, not the walking skeleton. Observed on `https://ambient-host-tomiwaalukos-projects.vercel.app/`: `document.modelContext` present; three vendor iframes; Gate 2 `window.ambient.call('acme.booking.search', { query: 'flights to lisbon' })` returns an enveloped Acme payload with `bk-101` (Lisbon, 2026-10-12); `runTripPlan` shows **Trip plan ready** (Acme flight + Zenith return-window article); inspector **Revoke tools** on Acme → row `revoked`, Acme proxies gone, iframe `allow` cleared. `cc4f895` made Gate 2 match when the query *contains* the destination (`flights to lisbon`); earlier matching required the destination to contain the whole query and returned `results: []`. Path-filtered ignoreCommand skipped the three unchanged origins on that push. **PRO-15 and PRO-16 stay In Progress in Linear until someone with Ambient workspace access (`projects-and-hackathons` / team PRO) marks them Done against this evidence.** Do not close PRO-18.
+
 ## The graph
 
 ```mermaid
@@ -160,7 +162,7 @@ The moment PRO-5 reports, three things start:
 
 ### Wave 4 — Convergence (2 concurrent)
 
-**PRO-15** and **PRO-16** both need PRO-8 and PRO-14. This is the first point where a wrong assumption in two lanes becomes visible at once. **Put your schedule slack here, not after.**
+**PRO-15** and **PRO-16** both needed PRO-8 and PRO-14. Code is merged (`#12`, `#13`) and live DoD is observed on production (see Deployed origins). Linear Done is still outstanding — Ambient tickets are not writable from a Linear connection scoped to NSBE Tracker.
 
 ### Wave 5 — Submission
 
