@@ -113,7 +113,16 @@ async function callProxy(name, input) {
     };
   }
 
-  const tools = await document.modelContext.getTools();
+  let tools;
+  try {
+    tools = await document.modelContext.getTools();
+  } catch (cause) {
+    return {
+      ok: false,
+      code: 'TOOL_DISCOVERY_FAILED',
+      message: String(cause?.message ?? cause)
+    };
+  }
   const tool = tools.find((entry) => entry.name === name);
   if (!tool) {
     return {
@@ -211,6 +220,8 @@ function appendEnvelopeDisclosure(card, envelopedText, innerText) {
  *   support: unknown,
  *   acmeOk: boolean,
  *   zenithOk: boolean,
+ *   acmeFailure: { code: string, message: string } | null,
+ *   zenithFailure: { code: string, message: string } | null,
  *   flightsEnvelope: string | null,
  *   flightsInner: string | null,
  *   supportEnvelope: string | null,
@@ -219,16 +230,30 @@ function appendEnvelopeDisclosure(card, envelopedText, innerText) {
  */
 function renderTripOutcome(outcomeEl, data) {
   outcomeEl.replaceChildren();
-  outcomeEl.dataset.state = 'complete';
+
+  const acmeReady = data.acmeOk && data.flights != null;
+  const zenithReady = data.zenithOk && data.support != null;
+  const state =
+    acmeReady && zenithReady ? 'complete' : acmeReady || zenithReady ? 'partial' : 'failed';
+  outcomeEl.dataset.state = state;
 
   const heading = document.createElement('h2');
   heading.id = 'outcome-heading';
-  heading.textContent = 'Trip plan ready';
+  heading.textContent =
+    state === 'complete'
+      ? 'Trip plan ready'
+      : state === 'partial'
+        ? 'Trip plan partially ready'
+        : 'Trip plan failed';
 
   const intro = document.createElement('p');
   intro.className = 'outcome-lead';
   intro.textContent =
-    'An agent combined flights from Acme Booking with return-policy articles from Zenith Support — two vendors, one page-level outcome. Widget strings reach the agent inside a host-authored envelope that names the contributing origin.';
+    state === 'complete'
+      ? "The host's governed proxy surface called Acme Booking and Zenith Support, then combined both vendors' results into one page-level outcome."
+      : state === 'partial'
+        ? "The host's governed proxy surface attempted to call Acme Booking and Zenith Support; one vendor returned usable results and the other attempt did not."
+        : "The host's governed proxy surface attempted to call Acme Booking and Zenith Support; neither attempt returned usable results.";
 
   const grid = document.createElement('div');
   grid.className = 'outcome-grid';
@@ -240,10 +265,13 @@ function renderTripOutcome(outcomeEl, data) {
   flightsCard.appendChild(flightsHeading);
   const flightsBody = document.createElement('div');
   flightsBody.className = 'outcome-card-body';
-  if (data.acmeOk && data.flights) {
+  if (acmeReady) {
     flightsBody.appendChild(formatFlightResults(data.flights));
   } else {
-    flightsBody.textContent = 'Flight search did not return results.';
+    flightsBody.classList.add('outcome-error');
+    flightsBody.textContent = data.acmeFailure
+      ? `${data.acmeFailure.code} — ${data.acmeFailure.message}`
+      : 'FLIGHT_RESULTS_UNAVAILABLE — Flight search did not return results.';
   }
   flightsCard.appendChild(flightsBody);
   appendEnvelopeDisclosure(flightsCard, data.flightsEnvelope, data.flightsInner);
@@ -255,10 +283,13 @@ function renderTripOutcome(outcomeEl, data) {
   supportCard.appendChild(supportHeading);
   const supportBody = document.createElement('div');
   supportBody.className = 'outcome-card-body';
-  if (data.zenithOk && data.support) {
+  if (zenithReady) {
     supportBody.appendChild(formatSupportResults(data.support));
   } else {
-    supportBody.textContent = 'Support search did not return results.';
+    supportBody.classList.add('outcome-error');
+    supportBody.textContent = data.zenithFailure
+      ? `${data.zenithFailure.code} — ${data.zenithFailure.message}`
+      : 'SUPPORT_RESULTS_UNAVAILABLE — Support search did not return results.';
   }
   supportCard.appendChild(supportBody);
   appendEnvelopeDisclosure(supportCard, data.supportEnvelope, data.supportInner);
@@ -383,6 +414,8 @@ export async function runTripPlan(outcomeEl = document.getElementById('outcome')
     support: zenithExtract.payload,
     acmeOk: acmeOutcome.ok,
     zenithOk: zenithOutcome.ok,
+    acmeFailure: acmeOutcome.ok ? null : acmeOutcome,
+    zenithFailure: zenithOutcome.ok ? null : zenithOutcome,
     flightsEnvelope: acmeExtract.envelopedText,
     flightsInner: acmeExtract.innerText,
     supportEnvelope: zenithExtract.envelopedText,
