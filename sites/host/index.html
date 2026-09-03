@@ -14,155 +14,489 @@
 <meta http-equiv="origin-trial" content="AmAebnj3Dor43RsIpYcXYDI2h5qIADVBB1QaJPuxNSZJiaMn29Xs9Eos1cWt13c1PtUJ8t2u4JIhMcaYFrfWRQ8AAABteyJvcmlnaW4iOiJodHRwczovL2FtYmllbnQtaG9zdC10b21pd2FhbHVrb3MtcHJvamVjdHMudmVyY2VsLmFwcDo0NDMiLCJmZWF0dXJlIjoiV2ViTUNQIiwiZXhwaXJ5IjoxNzk0ODczNjAwfQ==">
 
 <style>
-  :root { color-scheme: light dark; }
-  body {
-    font: 15px/1.5 system-ui, sans-serif;
-    max-width: 52rem;
-    margin: 0 auto;
-    padding: 1.5rem;
-  }
-  h1 { font-size: 1.35rem; margin: 0 0 .25rem; }
-  .intro { color: color-mix(in srgb, currentColor 65%, transparent); margin: 0 0 1.5rem; }
-  section { margin: 0 0 2rem; }
-  section h2 { font-size: 1rem; font-weight: 600; margin: 0 0 .5rem; text-transform: uppercase; letter-spacing: .04em; }
-  code { font-family: ui-monospace, monospace; font-size: .92em; }
+  /* ---------------------------------------------------------------
+     Design tokens. Light values live on bare :root; the dark block
+     redefines the same names. Semantic state colors are ADDITIVE only —
+     every lifecycle state also carries a shape glyph and a text label
+     (see src/host/inspector.js), so color is never the sole carrier.
+     --------------------------------------------------------------- */
+  :root {
+    color-scheme: light dark;
 
-  /* R45 tier 1 — outcome is the primary surface */
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono",
+      "Segoe UI Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+    --bg: #fbfaf9;
+    --surface: #ffffff;
+    --surface-sunken: #f2f1ef;
+    --text: #16181d;
+    --text-muted: #5b6069;
+    --line: #d9d6d1;
+    /* --line-strong is used for real UI boundaries (button edges, the
+       inspector row's default accent). Held at >=3:1 against --surface. */
+    --line-strong: #8a8781;
+
+    --accent: #4338ca;
+    --accent-hover: #3730a3;
+    --accent-on: #ffffff;
+    --accent-tint: #eef0fd;
+    --accent-line: #c7cbf7;
+
+    --danger: #b00020;
+    --danger-tint: #fdeced;
+    --warn: #a16207;
+    --warn-tint: #fdf5e3;
+    --ok: #15803d;
+    --info: #1d4ed8;
+
+    --state-active: var(--ok);
+    --state-degraded: var(--warn);
+    --state-quarantined: var(--danger);
+    --state-revoking: var(--text-muted);
+    --state-revoked: var(--text-muted);
+    --state-discovering: var(--info);
+    --state-evaluating: var(--info);
+
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --shadow-card: 0 1px 2px rgba(16, 18, 24, .05), 0 1px 1px rgba(16, 18, 24, .04);
+    --shadow-hero: 0 1px 2px rgba(16, 18, 24, .05), 0 10px 28px -18px rgba(16, 18, 24, .35);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131417;
+      --surface: #1b1d22;
+      --surface-sunken: #232630;
+      --text: #eceef2;
+      --text-muted: #a4a9b4;
+      --line: #3a3f4a;
+      --line-strong: #6e7484;
+
+      --accent: #a5b4fc;
+      --accent-hover: #c3ccfe;
+      --accent-on: #191b2e;
+      --accent-tint: #23263a;
+      --accent-line: #3f4566;
+
+      --danger: #ff9aa4;
+      --danger-tint: #2f1c21;
+      --warn: #f0c05a;
+      --warn-tint: #2c2415;
+      --ok: #6ee7a0;
+      --info: #9dc0ff;
+
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, .4);
+      --shadow-hero: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -20px rgba(0, 0, 0, .9);
+    }
+  }
+
+  /* ---------------------------------------------------------------
+     Page frame and type scale
+     --------------------------------------------------------------- */
+  body {
+    font: 15px/1.6 var(--font-sans);
+    color: var(--text);
+    background: var(--bg);
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: clamp(1rem, 4vw, 2.5rem) clamp(.85rem, 4vw, 2rem) 4rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header { margin: 0 0 clamp(1.5rem, 4vw, 2.25rem); }
+  h1 {
+    font-size: clamp(1.6rem, 5vw, 2.05rem);
+    line-height: 1.15;
+    letter-spacing: -.021em;
+    font-weight: 660;
+    margin: 0 0 .3rem;
+  }
+  .intro {
+    color: var(--text-muted);
+    font-size: clamp(.95rem, 2.4vw, 1.05rem);
+    max-width: 44rem;
+    margin: 0;
+  }
+
+  section { margin: 0 0 clamp(1.75rem, 5vw, 2.75rem); }
+  section h2 {
+    font-size: 1.06rem;
+    font-weight: 650;
+    letter-spacing: -.008em;
+    text-transform: none;
+    margin: 0 0 .75rem;
+  }
+  code { font-family: var(--font-mono); font-size: .92em; }
+
+  /* Peer-section eyebrow: a short accent rule above the heading so
+     "Governed tools" and "Federation diagnostics" read as siblings
+     that sit clearly below the hero. */
+  #tools-panel,
+  #diagnostics {
+    border-top: 1px solid var(--line);
+    padding-top: clamp(1.25rem, 4vw, 1.75rem);
+  }
+  #tools-panel h2,
+  #diagnostics h2 {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    font-size: .78rem;
+    font-weight: 680;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--text-muted);
+    margin: 0 0 .9rem;
+  }
+  #tools-panel h2::before,
+  #diagnostics h2::before {
+    content: "";
+    width: 1.35rem;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    flex: none;
+  }
+
+  /* ---------------------------------------------------------------
+     Buttons — one primary, one secondary, one tertiary.
+     All keep a >=44px hit target and a visible focus ring.
+     --------------------------------------------------------------- */
+  #run-trip-plan,
+  #simulate-hostile,
+  #inspector .inspector-actions button {
+    font: 600 .94rem/1.2 var(--font-sans);
+    letter-spacing: -.004em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    min-height: 44px;
+    padding: .7rem 1.15rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color .14s ease, border-color .14s ease, color .14s ease;
+  }
+
+  /* Primary */
+  #run-trip-plan {
+    background: var(--accent);
+    color: var(--accent-on);
+    border-color: var(--accent);
+    padding-inline: 1.35rem;
+    box-shadow: var(--shadow-card);
+  }
+  #run-trip-plan:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+  /* Secondary */
+  #simulate-hostile {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--line-strong);
+  }
+  #simulate-hostile:hover { background: var(--surface-sunken); border-color: var(--text-muted); }
+
+  /* Tertiary (per-row, inside the inspector). ID specificity so it beats the
+     module's own baseline rule, which is injected later in <head>. */
+  #inspector .inspector-actions button {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--line-strong);
+    font-size: .86rem;
+    min-height: 44px;
+    padding: .5rem .9rem;
+  }
+  #inspector .inspector-actions button:hover { background: var(--surface-sunken); border-color: var(--text-muted); }
+
+  button:focus-visible,
+  summary:focus-visible,
+  .inspector-origin:focus,
+  .inspector-origin:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0s !important; animation-duration: 0s !important; }
+  }
+
+  /* ---------------------------------------------------------------
+     R45 tier 1 — outcome is the primary surface
+     --------------------------------------------------------------- */
+  #outcome-region { margin-bottom: clamp(1.75rem, 5vw, 2.5rem); }
   #outcome {
-    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
-    border-radius: 10px;
-    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-lg);
+    padding: clamp(1.1rem, 4vw, 1.75rem);
     min-height: 8rem;
-    background: color-mix(in srgb, Canvas 92%, Highlight 8%);
+    background:
+      linear-gradient(180deg, var(--accent-tint) 0%, var(--surface) 42%);
+    box-shadow: var(--shadow-hero);
   }
   #outcome h2 {
-    font-size: 1.5rem;
+    font-size: clamp(1.35rem, 4.4vw, 1.7rem);
+    line-height: 1.2;
+    font-weight: 660;
+    letter-spacing: -.02em;
     text-transform: none;
-    letter-spacing: normal;
-    margin: 0 0 .35rem;
+    margin: 0 0 .45rem;
   }
-  .outcome-lead { margin: 0 0 1rem; max-width: 40rem; }
+  .outcome-lead {
+    margin: 0 0 1.25rem;
+    max-width: 42rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+  }
   .outcome-grid {
     display: grid;
     gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   }
   .outcome-card {
-    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-    border-radius: 8px;
-    padding: .75rem 1rem;
-    background: Canvas;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: .9rem 1.05rem 1rem;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    min-width: 0;
   }
-  .outcome-card h3 { margin: 0 0 .5rem; font-size: .95rem; }
-  .outcome-list { margin: 0; padding-left: 1.2rem; }
-  .outcome-error { color: #b00020; margin: 0; }
-  #outcome button {
-    font: inherit;
-    padding: .5rem 1rem;
-    cursor: pointer;
+  .outcome-card h3 {
+    margin: 0 0 .55rem;
+    font-size: .8rem;
+    font-weight: 680;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--text-muted);
   }
-  button:focus-visible,
-  summary:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
+  .outcome-list { margin: 0; padding-left: 1.15rem; }
+  .outcome-list li { margin: 0 0 .3rem; }
+  .outcome-list li:last-child { margin-bottom: 0; }
+  .outcome-error {
+    color: var(--danger);
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: .84rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
-  /* R45 tier 2 — tools with provenance */
-  #tools-panel h2 { font-size: .85rem; }
-  .tool-provenance-list { list-style: none; margin: 0; padding: 0; }
+  /* ---------------------------------------------------------------
+     R45 tier 2 — tools with provenance.
+     Tool name is the primary object; the contributing origin is a
+     muted trailing chip that drops to its own line when space runs out.
+     --------------------------------------------------------------- */
+  .tool-provenance-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+  }
   .tool-provenance-list li {
     display: flex;
     flex-wrap: wrap;
-    gap: .5rem 1rem;
-    align-items: baseline;
-    padding: .35rem 0;
-    border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+    gap: .3rem .9rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: .7rem .95rem;
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+  }
+  .tool-provenance-list li:last-child { border-bottom: 0; }
+  .tool-provenance-list li:nth-child(even) { background: color-mix(in srgb, var(--surface-sunken) 55%, transparent); }
+  .tool-provenance-list code {
+    font-family: var(--font-mono);
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
   .tool-origin {
-    font-size: .82rem;
-    color: color-mix(in srgb, currentColor 55%, transparent);
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+    background: var(--surface-sunken);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: .18rem .55rem;
     word-break: break-all;
+    max-width: 100%;
   }
-  .tools-empty { color: color-mix(in srgb, currentColor 55%, transparent); margin: 0; }
+  .tools-empty {
+    color: var(--text-muted);
+    margin: 0;
+    padding: .85rem .95rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+  }
 
-  /* R45 tier 3 — diagnostics */
-  #diagnostics h2 { font-size: .85rem; color: color-mix(in srgb, currentColor 55%, transparent); }
+  /* ---------------------------------------------------------------
+     R45 tier 3 — diagnostics
+     --------------------------------------------------------------- */
   .inspector-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .inspector-table th, .inspector-table td {
-    border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+    border: 1px solid var(--line);
     padding: .35rem .5rem;
     text-align: left;
     vertical-align: top;
   }
 
-  /* Widget embeds — present but not the story */
-  #widgets { margin-top: 2.5rem; }
-  #widgets summary { cursor: pointer; color: color-mix(in srgb, currentColor 60%, transparent); }
-  iframe {
-    width: 100%;
-    height: 120px;
-    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-    border-radius: 6px;
-    margin: .5rem 0;
-  }
-
-  #unsupported {
-    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    background: color-mix(in srgb, currentColor 6%, transparent);
-  }
-
+  /* Containment drill: the honesty disclaimer stays in full, set as a
+     narrow muted column so the button below it is the obvious target. */
   .containment-demo {
-    margin: 0 0 1rem;
-    padding: .85rem 1rem;
-    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-    border-radius: 8px;
-    background: Canvas;
+    margin: 0 0 1.25rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .85rem;
   }
-  .containment-demo p { margin: 0 0 .65rem; }
-  .containment-demo button {
-    font: inherit;
-    padding: .5rem 1rem;
-    cursor: pointer;
+  .containment-demo p {
+    margin: 0;
+    max-width: 46rem;
+    font-size: .88rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+    text-wrap: pretty;
   }
   .hostile-status {
-    margin: .65rem 0 0;
+    margin: 0;
     min-height: 1.5em;
-    font-size: .92rem;
+    font-size: .88rem;
+    color: var(--text-muted);
   }
-  .hostile-status[data-ok="false"] { color: #b00020; }
+  .hostile-status:not(:empty) {
+    padding: .6rem .75rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken);
+    align-self: stretch;
+  }
+  .hostile-status[data-ok="false"] {
+    color: var(--danger);
+    background: var(--danger-tint);
+  }
 
+  /* ---------------------------------------------------------------
+     Envelope disclosure
+     --------------------------------------------------------------- */
   .envelope-disclosure {
-    margin-top: .75rem;
+    margin-top: .9rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--line);
     font-size: .85rem;
   }
-  .envelope-disclosure summary { cursor: pointer; }
+  .envelope-disclosure summary {
+    cursor: pointer;
+    font-weight: 620;
+    color: var(--text-muted);
+    list-style-position: outside;
+  }
   .envelope-note {
-    margin: .5rem 0 .35rem;
-    color: color-mix(in srgb, currentColor 65%, transparent);
+    margin: .55rem 0 .5rem;
+    color: var(--text-muted);
+    font-size: .82rem;
+    line-height: 1.5;
   }
   .envelope-pair {
     display: grid;
-    gap: .5rem;
+    gap: .55rem;
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
   .envelope-text {
     margin: 0;
-    padding: .5rem .6rem;
-    border-radius: 6px;
-    background: color-mix(in srgb, currentColor 6%, transparent);
+    padding: .55rem .65rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken);
     overflow-x: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-size: 11px;
-    font-family: ui-monospace, monospace;
+    line-height: 1.5;
+    font-family: var(--font-mono);
   }
   .envelope-caption {
-    margin: 0 0 .25rem;
-    font-size: .8rem;
-    color: color-mix(in srgb, currentColor 60%, transparent);
+    margin: 0 0 .3rem;
+    font-size: .72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
   }
+
+  /* ---------------------------------------------------------------
+     Widget embeds — present but not the story
+     --------------------------------------------------------------- */
+  #widgets {
+    margin-top: clamp(1.75rem, 5vw, 2.5rem);
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+  }
+  #widgets summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: .86rem;
+    font-weight: 600;
+  }
+  iframe {
+    width: 100%;
+    height: 120px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    margin: .6rem 0;
+  }
+
+  /* ---------------------------------------------------------------
+     No-WebMCP fallback — judge-visible, so it gets the same care.
+     --------------------------------------------------------------- */
+  #unsupported {
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-lg);
+    padding: clamp(1.1rem, 4vw, 1.6rem);
+    background: linear-gradient(180deg, var(--accent-tint) 0%, var(--surface) 60%);
+    box-shadow: var(--shadow-hero);
+  }
+  #unsupported h2 {
+    font-size: clamp(1.15rem, 3.6vw, 1.35rem);
+    font-weight: 660;
+    letter-spacing: -.015em;
+    text-transform: none;
+    margin: 0 0 .6rem;
+  }
+  #unsupported p {
+    margin: 0 0 .7rem;
+    max-width: 44rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  #unsupported p:last-child { margin-bottom: 0; }
+  #unsupported code {
+    background: var(--surface-sunken);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .05rem .3rem;
+    color: var(--text);
+  }
+  #unsupported strong { color: var(--text); }
 </style>
 </head>
 <body>
