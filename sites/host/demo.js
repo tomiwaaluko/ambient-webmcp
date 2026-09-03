@@ -1,5 +1,5 @@
 /**
- * Host demo page boot — three vendor embeds, cross-vendor task path, Gate 2 API.
+ * Host demo page boot — three vendor embeds, cross-vendor task path, containment trigger.
  */
 
 import { startAggregator, ALLOWLIST } from './host/aggregator.js';
@@ -46,6 +46,34 @@ export function withdrawGrantAndReset(origin) {
     { once: true }
   );
   iframe.src = iframe.src;
+}
+
+/**
+ * Reload the Zenith iframe with the existing hostile query param.
+ * Screening (not this function) is what moves the origin to quarantined.
+ * @returns {{ ok: true } | { ok: false, code: string, message: string }}
+ */
+export function simulateHostileWidget() {
+  const origin = ORIGINS.zenith;
+  const iframe = document.querySelector(`iframe[data-origin="${CSS.escape(origin)}"]`);
+  if (!(iframe instanceof HTMLIFrameElement)) {
+    return {
+      ok: false,
+      code: 'WIDGET_FRAME_MISSING',
+      message: 'The Zenith Support iframe is not on this page, so it could not be reloaded with the hostile query.'
+    };
+  }
+
+  try {
+    iframe.src = `${origin}/?hostile=1`;
+  } catch (cause) {
+    return {
+      ok: false,
+      code: 'HOSTILE_RELOAD_FAILED',
+      message: String(cause?.message ?? cause)
+    };
+  }
+  return { ok: true };
 }
 
 /**
@@ -109,24 +137,85 @@ function unwrapEnvelopedText(text) {
 
 /**
  * @param {{ ok: true, result: unknown } | { ok: false, code: string, message: string }} outcome
- * @returns {unknown}
+ * @returns {{ payload: unknown, envelopedText: string | null, innerText: string | null }}
  */
 function extractPayload(outcome) {
-  if (!outcome.ok) return null;
+  if (!outcome.ok) {
+    return { payload: null, envelopedText: null, innerText: null };
+  }
   const result = /** @type {{ content?: Array<{ text?: string }> }} */ (outcome.result);
   const text = result?.content?.[0]?.text;
-  if (typeof text !== 'string') return outcome.result;
-  const inner = unwrapEnvelopedText(text);
-  try {
-    return JSON.parse(inner);
-  } catch {
-    return inner;
+  if (typeof text !== 'string') {
+    return { payload: outcome.result, envelopedText: null, innerText: null };
   }
+  const inner = unwrapEnvelopedText(text);
+  let payload;
+  try {
+    payload = JSON.parse(inner);
+  } catch {
+    payload = inner;
+  }
+  return { payload, envelopedText: text, innerText: inner };
+}
+
+/**
+ * @param {HTMLElement} card
+ * @param {string | null} envelopedText
+ * @param {string | null} innerText
+ */
+function appendEnvelopeDisclosure(card, envelopedText, innerText) {
+  if (typeof envelopedText !== 'string' || envelopedText.length === 0) return;
+
+  const details = document.createElement('details');
+  details.className = 'envelope-disclosure';
+  details.open = true;
+
+  const summary = document.createElement('summary');
+  summary.textContent = 'Host-authored envelope';
+
+  const note = document.createElement('p');
+  note.className = 'envelope-note';
+  note.textContent =
+    'The host rebuilt the widget string and labeled the contributing origin. The card above parses the vendor body inside that wrap.';
+
+  const pair = document.createElement('div');
+  pair.className = 'envelope-pair';
+
+  const rebuilt = document.createElement('div');
+  const rebuiltCaption = document.createElement('p');
+  rebuiltCaption.className = 'envelope-caption';
+  rebuiltCaption.textContent = 'Host-rebuilt (origin labeled)';
+  const rebuiltPre = document.createElement('pre');
+  rebuiltPre.className = 'envelope-text';
+  rebuiltPre.textContent = envelopedText;
+  rebuilt.append(rebuiltCaption, rebuiltPre);
+
+  const vendor = document.createElement('div');
+  const vendorCaption = document.createElement('p');
+  vendorCaption.className = 'envelope-caption';
+  vendorCaption.textContent = 'Vendor body (inside the wrap)';
+  const vendorPre = document.createElement('pre');
+  vendorPre.className = 'envelope-text';
+  vendorPre.textContent = typeof innerText === 'string' ? innerText : envelopedText;
+  vendor.append(vendorCaption, vendorPre);
+
+  pair.append(rebuilt, vendor);
+  details.append(summary, note, pair);
+  card.appendChild(details);
 }
 
 /**
  * @param {HTMLElement} outcomeEl
- * @param {{ flights: unknown, support: unknown, acmeOk: boolean, zenithOk: boolean }} data
+ * @param {{
+ *   flights: unknown,
+ *   support: unknown,
+ *   acmeOk: boolean,
+ *   zenithOk: boolean,
+ *   flightsEnvelope: string | null,
+ *   flightsInner: string | null,
+ *   supportEnvelope: string | null,
+ *   supportInner: string | null
+ * }} data
  */
 function renderTripOutcome(outcomeEl, data) {
   outcomeEl.replaceChildren();
@@ -139,14 +228,16 @@ function renderTripOutcome(outcomeEl, data) {
   const intro = document.createElement('p');
   intro.className = 'outcome-lead';
   intro.textContent =
-    'An agent combined flights from Acme Booking with return-policy articles from Zenith Support — two vendors, one page-level outcome.';
+    'An agent combined flights from Acme Booking with return-policy articles from Zenith Support — two vendors, one page-level outcome. Widget strings reach the agent inside a host-authored envelope that names the contributing origin.';
 
   const grid = document.createElement('div');
   grid.className = 'outcome-grid';
 
   const flightsCard = document.createElement('article');
   flightsCard.className = 'outcome-card';
-  flightsCard.innerHTML = '<h3>Flights · Acme Booking</h3>';
+  const flightsHeading = document.createElement('h3');
+  flightsHeading.textContent = 'Flights · Acme Booking';
+  flightsCard.appendChild(flightsHeading);
   const flightsBody = document.createElement('div');
   flightsBody.className = 'outcome-card-body';
   if (data.acmeOk && data.flights) {
@@ -155,10 +246,13 @@ function renderTripOutcome(outcomeEl, data) {
     flightsBody.textContent = 'Flight search did not return results.';
   }
   flightsCard.appendChild(flightsBody);
+  appendEnvelopeDisclosure(flightsCard, data.flightsEnvelope, data.flightsInner);
 
   const supportCard = document.createElement('article');
   supportCard.className = 'outcome-card';
-  supportCard.innerHTML = '<h3>Support · Zenith Support</h3>';
+  const supportHeading = document.createElement('h3');
+  supportHeading.textContent = 'Support · Zenith Support';
+  supportCard.appendChild(supportHeading);
   const supportBody = document.createElement('div');
   supportBody.className = 'outcome-card-body';
   if (data.zenithOk && data.support) {
@@ -167,6 +261,7 @@ function renderTripOutcome(outcomeEl, data) {
     supportBody.textContent = 'Support search did not return results.';
   }
   supportCard.appendChild(supportBody);
+  appendEnvelopeDisclosure(supportCard, data.supportEnvelope, data.supportInner);
 
   grid.append(flightsCard, supportCard);
   outcomeEl.append(heading, intro, grid);
@@ -232,7 +327,7 @@ function renderOutcomePending(outcomeEl) {
   const copy = document.createElement('p');
   copy.className = 'outcome-lead';
   copy.textContent =
-    'Ask an agent to find flights to Lisbon and check return policies — or run the demo task below. The outcome appears here first.';
+    'Ask an agent to find flights to Lisbon and check return policies — or run the demo task below. The outcome appears here first, with the host-authored envelope beside the parsed vendor fields.';
 
   const runBtn = document.createElement('button');
   runBtn.type = 'button';
@@ -280,11 +375,18 @@ export async function runTripPlan(outcomeEl = document.getElementById('outcome')
     callProxy('zenith.support.search', { query: 'return' })
   ]);
 
+  const acmeExtract = extractPayload(acmeOutcome);
+  const zenithExtract = extractPayload(zenithOutcome);
+
   renderTripOutcome(outcomeEl, {
-    flights: extractPayload(acmeOutcome),
-    support: extractPayload(zenithOutcome),
+    flights: acmeExtract.payload,
+    support: zenithExtract.payload,
     acmeOk: acmeOutcome.ok,
-    zenithOk: zenithOutcome.ok
+    zenithOk: zenithOutcome.ok,
+    flightsEnvelope: acmeExtract.envelopedText,
+    flightsInner: acmeExtract.innerText,
+    supportEnvelope: zenithExtract.envelopedText,
+    supportInner: zenithExtract.innerText
   });
 
   return { acme: acmeOutcome, zenith: zenithOutcome };
@@ -375,6 +477,8 @@ export function bootDemo() {
   const toolListEl = document.getElementById('tool-list');
   const framesEl = document.getElementById('frames');
   const inspectorEl = document.getElementById('inspector');
+  const hostileBtn = document.getElementById('simulate-hostile');
+  const hostileStatus = document.getElementById('hostile-status');
 
   if (
     !(unsupportedEl instanceof HTMLElement) ||
@@ -382,7 +486,9 @@ export function bootDemo() {
     !(outcomeEl instanceof HTMLElement) ||
     !(toolListEl instanceof HTMLElement) ||
     !(framesEl instanceof HTMLElement) ||
-    !(inspectorEl instanceof HTMLElement)
+    !(inspectorEl instanceof HTMLElement) ||
+    !(hostileBtn instanceof HTMLButtonElement) ||
+    !(hostileStatus instanceof HTMLElement)
   ) {
     throw new Error('Demo page is missing required mount points.');
   }
@@ -412,12 +518,15 @@ export function bootDemo() {
     renderToolList(toolListEl, snapshot);
   });
 
-  const gateBtn = document.getElementById('gate2-call');
-  gateBtn?.addEventListener('click', async () => {
-    const logEl = document.getElementById('gate2-log');
-    const outcome = await callProxy('acme.booking.search', { query: 'flights to lisbon' });
-    if (logEl instanceof HTMLElement) {
-      logEl.textContent = JSON.stringify(outcome, null, 2);
+  hostileBtn.addEventListener('click', () => {
+    const outcome = simulateHostileWidget();
+    if (outcome.ok) {
+      hostileStatus.dataset.ok = 'true';
+      hostileStatus.textContent =
+        'Reloaded Zenith Support with ?hostile=1. Watch its inspector row — screening should move it to Quarantined with a reason.';
+      return;
     }
+    hostileStatus.dataset.ok = 'false';
+    hostileStatus.textContent = `${outcome.code}: ${outcome.message}`;
   });
 }
