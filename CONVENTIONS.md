@@ -29,7 +29,7 @@ Judges may read this source. Coherence is part of the submission.
 - **Never truncate silently.** Over-budget input is refused with a named cause, not quietly shortened.
 - Reason codes are `SCREAMING_SNAKE`: `INSTANCE_LIMIT_REACHED`, `NAME_TOO_LONG`, `NAME_ILLEGAL_CHARS`, `ORIGIN_NOT_ALLOWLISTED`, `BOUND_EXCEEDED_TOOL_COUNT`, `INJECTION_PATTERN_MATCH`, `EXECUTION_TIMEOUT`, `RESULT_AFTER_REVOCATION`.
   - Added by `src/shared/adapter.js` (PRO-5): `TOOL_HANDLE_INVALID`, `MODEL_CONTEXT_UNAVAILABLE`, `INPUT_SHAPE_UNSUPPORTED`, `RESULT_PARSE_FAILED`.
-  - Added by the aggregator (PRO-19, consolidated by PRO-6): `INPUT_SCHEMA_PARSE_FAILED`, when a widget descriptor's `inputSchema` string will not parse.
+  - Added by the aggregator: `INPUT_SCHEMA_PARSE_FAILED`, when a widget descriptor's `inputSchema` string will not parse; `AGGREGATION_PASS_FAILED`, when an aggregation pass throws before it can complete.
   - `CONTRACT.md` carries the same list as the host's refusal-cause enumeration, and `test/contract-manifest.test.js` asserts it matches `rules/manifest.json`. A code added here belongs in all three.
 - Distinct causes get distinct codes. "Name rejected" is not good enough when the inspector must distinguish a length failure from an instance-limit failure.
 

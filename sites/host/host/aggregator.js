@@ -472,6 +472,27 @@ export async function aggregateOnce() {
     const snapshot = { generation: myGeneration, origins, errors };
     onUpdate?.(snapshot);
     return snapshot;
+  } catch (cause) {
+    const message = String(cause?.message ?? cause);
+    for (const runtime of originRuntime.values()) {
+      if (runtime.state.state === 'evaluating') {
+        moveOrigin(runtime, 'degraded', `AGGREGATION_PASS_FAILED: ${message}`);
+      }
+    }
+    const snapshot = {
+      generation: myGeneration,
+      origins: buildSnapshot().origins,
+      errors: [
+        ...errors,
+        {
+          origin: '(aggregator)',
+          code: 'AGGREGATION_PASS_FAILED',
+          message
+        }
+      ]
+    };
+    onUpdate?.(snapshot);
+    return null;
   } finally {
     passInFlight = false;
     if (passQueued) {
@@ -481,15 +502,21 @@ export async function aggregateOnce() {
   }
 }
 
+function runAggregationPass() {
+  void aggregateOnce().catch((cause) => {
+    console.error('AGGREGATION_PASS_FAILED:', cause);
+  });
+}
+
 export function startAggregator(callback) {
   onUpdate = callback ?? null;
 
   const onToolchange = () => {
-    aggregateOnce();
+    runAggregationPass();
   };
 
   document.modelContext?.addEventListener?.('toolchange', onToolchange);
-  aggregateOnce();
+  runAggregationPass();
 
   return () => {
     document.modelContext?.removeEventListener?.('toolchange', onToolchange);

@@ -44,7 +44,7 @@ Ambient is the other half: what a widget owes the page embedding it, and what a 
 | H11 | Bound what one origin may consume — tool count, metadata size, result size, concurrent executions, change rate — and name the breached bound, because silent truncation makes an over-budget widget look conformant. | `observed` |
 | H12 | Redact credential-, token-, and payment-shaped strings before they reach an envelope or a log, and keep logs in memory for the session alone; a log is a second copy of everything that passed through. | `observed` |
 
-**Every refusal names its cause:** `ORIGIN_NOT_ALLOWLISTED`, `NAME_TOO_LONG`, `NAME_ILLEGAL_CHARS`, `INSTANCE_LIMIT_REACHED`, `INJECTION_PATTERN_MATCH`, `BOUND_EXCEEDED_TOOL_COUNT`, `EXECUTION_TIMEOUT`, `RESULT_AFTER_REVOCATION`, `INPUT_SCHEMA_PARSE_FAILED`, `TOOL_HANDLE_INVALID`, `MODEL_CONTEXT_UNAVAILABLE`, `INPUT_SHAPE_UNSUPPORTED`, `RESULT_PARSE_FAILED`. A generic failure is indistinguishable from a widget that has no tools.
+**Every refusal names its cause:** `ORIGIN_NOT_ALLOWLISTED`, `NAME_TOO_LONG`, `NAME_ILLEGAL_CHARS`, `INSTANCE_LIMIT_REACHED`, `INJECTION_PATTERN_MATCH`, `BOUND_EXCEEDED_TOOL_COUNT`, `EXECUTION_TIMEOUT`, `RESULT_AFTER_REVOCATION`, `INPUT_SCHEMA_PARSE_FAILED`, `AGGREGATION_PASS_FAILED`, `TOOL_HANDLE_INVALID`, `MODEL_CONTEXT_UNAVAILABLE`, `INPUT_SHAPE_UNSUPPORTED`, `RESULT_PARSE_FAILED`. A generic failure is indistinguishable from a widget that has no tools.
 
 **Outside the checker.** No tool surface reveals it, so the manifest omits it: the host's governance surface must be keyboard-operable, announce state changes semantically, never signal state by color alone, keep focus predictable when a control disappears, and stay usable at narrow width.
 
