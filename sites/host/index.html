@@ -61,6 +61,11 @@
     padding: .5rem 1rem;
     cursor: pointer;
   }
+  button:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
 
   /* R45 tier 2 — tools with provenance */
   #tools-panel h2 { font-size: .85rem; }
@@ -108,21 +113,56 @@
     background: color-mix(in srgb, currentColor 6%, transparent);
   }
 
-  .gate2 {
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-    font-size: 13px;
+  .containment-demo {
+    margin: 0 0 1rem;
+    padding: .85rem 1rem;
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    border-radius: 8px;
+    background: Canvas;
+  }
+  .containment-demo p { margin: 0 0 .65rem; }
+  .containment-demo button {
+    font: inherit;
+    padding: .5rem 1rem;
+    cursor: pointer;
+  }
+  .hostile-status {
+    margin: .65rem 0 0;
+    min-height: 1.5em;
+    font-size: .92rem;
+  }
+  .hostile-status[data-ok="false"] { color: #b00020; }
+
+  .envelope-disclosure {
+    margin-top: .75rem;
+    font-size: .85rem;
+  }
+  .envelope-disclosure summary { cursor: pointer; }
+  .envelope-note {
+    margin: .5rem 0 .35rem;
+    color: color-mix(in srgb, currentColor 65%, transparent);
+  }
+  .envelope-pair {
+    display: grid;
+    gap: .5rem;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+  .envelope-text {
+    margin: 0;
+    padding: .5rem .6rem;
+    border-radius: 6px;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+  }
+  .envelope-caption {
+    margin: 0 0 .25rem;
+    font-size: .8rem;
     color: color-mix(in srgb, currentColor 60%, transparent);
   }
-  .gate2 pre {
-    background: color-mix(in srgb, currentColor 6%, transparent);
-    padding: .65rem;
-    border-radius: 6px;
-    overflow-x: auto;
-    font-size: 11px;
-  }
-  .gate2 button { font: inherit; font-size: 13px; padding: .25rem .6rem; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -156,6 +196,15 @@
     <!-- R45 tier 3: federation diagnostics -->
     <section id="diagnostics" aria-labelledby="diagnostics-heading">
       <h2 id="diagnostics-heading">Federation diagnostics</h2>
+      <div class="containment-demo">
+        <p>
+          Simulate a vendor shipping a tool whose description carries an agent-directed instruction.
+          The host screens that origin and should move its inspector row to Quarantined.
+          This does not prevent prompt injection.
+        </p>
+        <button type="button" id="simulate-hostile">Simulate a widget turning hostile</button>
+        <p id="hostile-status" class="hostile-status" aria-live="polite"></p>
+      </div>
       <div id="inspector" aria-live="polite"></div>
     </section>
 
@@ -163,12 +212,6 @@
       <summary>Embedded vendor widgets (three iframes)</summary>
       <div id="frames"></div>
     </details>
-
-    <div class="gate2">
-      <p>Gate 2 console path: <code>window.ambient.call('acme.booking.search', &#123; query: 'flights to lisbon' &#125;)</code></p>
-      <button type="button" id="gate2-call">Run Gate 2 call</button>
-      <pre id="gate2-log">—</pre>
-    </div>
   </div>
 
 <script type="module">
