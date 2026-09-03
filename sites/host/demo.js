@@ -176,7 +176,7 @@ function appendEnvelopeDisclosure(card, envelopedText, innerText) {
   const note = document.createElement('p');
   note.className = 'envelope-note';
   note.textContent =
-    'The host rebuilt the widget string and labeled the contributing origin. The card above parses the vendor body inside that wrap.';
+    'The host rebuilt the widget string, redacted credential-shaped text, fitted it to the 1500-character result budget, and labeled the contributing origin. The card above parses the body inside that wrap.';
 
   const pair = document.createElement('div');
   pair.className = 'envelope-pair';
@@ -193,7 +193,7 @@ function appendEnvelopeDisclosure(card, envelopedText, innerText) {
   const vendor = document.createElement('div');
   const vendorCaption = document.createElement('p');
   vendorCaption.className = 'envelope-caption';
-  vendorCaption.textContent = 'Vendor body (inside the wrap)';
+  vendorCaption.textContent = 'Body after host redaction, unwrapped';
   const vendorPre = document.createElement('pre');
   vendorPre.className = 'envelope-text';
   vendorPre.textContent = typeof innerText === 'string' ? innerText : envelopedText;
@@ -523,7 +523,7 @@ export function bootDemo() {
     if (outcome.ok) {
       hostileStatus.dataset.ok = 'true';
       hostileStatus.textContent =
-        'Reloaded Zenith Support with ?hostile=1. Watch its inspector row — screening should move it to Quarantined with a reason.';
+        'Reloaded Zenith Support with ?hostile=1. Watch its inspector row — screening quarantines it for the agent-directed description. If the surface-change rate bound trips first you will see Degraded instead; both are containment, and both name their reason.';
       return;
     }
     hostileStatus.dataset.ok = 'false';
