@@ -201,7 +201,12 @@ function renderOriginList(chrome, snapshot) {
   const { list } = chrome;
   list.replaceChildren();
 
-  if (snapshot.origins.length === 0) {
+  const representedOrigins = new Set(snapshot.origins.map((row) => String(row.origin ?? '')));
+  const unrepresentedErrors = snapshot.errors.filter(
+    (error) => !representedOrigins.has(String(error.origin ?? ''))
+  );
+
+  if (snapshot.origins.length === 0 && unrepresentedErrors.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'inspector-empty';
     empty.textContent = 'No federated origins yet.';
@@ -211,6 +216,22 @@ function renderOriginList(chrome, snapshot) {
 
   for (const row of snapshot.origins) {
     list.appendChild(buildOriginRow(row, snapshot));
+  }
+
+  for (const error of unrepresentedErrors) {
+    list.appendChild(
+      buildOriginRow(
+        {
+          origin: error.origin,
+          state: 'degraded',
+          reason: `${error.code}: ${error.message}`,
+          code: error.code,
+          tools: [],
+          revokeable: false
+        },
+        snapshot
+      )
+    );
   }
 }
 
@@ -283,7 +304,7 @@ function buildOriginRow(row, snapshot) {
     li.appendChild(flightEl);
   }
 
-  if (REVOKEABLE.has(state)) {
+  if (row.revokeable !== false && REVOKEABLE.has(state)) {
     const actions = document.createElement('div');
     actions.className = 'inspector-actions';
     const button = document.createElement('button');
@@ -351,6 +372,9 @@ export function classifyCause(row, errors = []) {
     return { key: 'quarantined', label: 'Quarantined' };
   }
 
+  if (/AGGREGATION_PASS_FAILED/.test(blob)) {
+    return { key: 'aggregation-pass', label: 'Aggregation failed' };
+  }
   if (isMalformedCall(blob)) {
     return { key: 'malformed-call', label: 'Malformed call' };
   }

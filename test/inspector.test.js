@@ -11,6 +11,8 @@ import {
   classifyCause
 } from '../src/host/inspector.js';
 import {
+  startAggregator,
+  setManifestForTests,
   revokeOrigin,
   seedOriginForTests,
   resetAggregatorForTests,
@@ -25,6 +27,9 @@ const ZENITH = 'https://zenith-support-tomiwaalukos-projects.vercel.app';
 const INSPECTOR_SRC = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../src/host/inspector.js'),
   'utf8'
+);
+const MANIFEST = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../rules/manifest.json'), 'utf8')
 );
 
 function createNode(tagName) {
@@ -380,6 +385,187 @@ describe('renderInspector — seven lifecycle states', () => {
       origins: [{ origin: ACME, state: 'active', reason: 'ok', tools: ['acme.booking.search'] }]
     });
     assert.match(rowText(originRow(container, ACME)), /acme\.booking\.search/);
+  });
+
+  test('an aggregator-level error renders as a named failure instead of a healthy empty state', () => {
+    const container = document.createElement('div');
+    renderInspector(container, {
+      generation: 1,
+      origins: [],
+      errors: [
+        {
+          origin: '(aggregator)',
+          code: 'AGGREGATION_PASS_FAILED',
+          message: 'Manifest unavailable.'
+        }
+      ]
+    });
+
+    const row = originRow(container, '(aggregator)');
+    assert.ok(row, 'aggregator failure row should be rendered');
+    assert.equal(row.dataset.cause, 'aggregation-pass');
+    assert.match(rowText(row), /AGGREGATION_PASS_FAILED/);
+    assert.equal(walkFind(row, 'button', true).length, 0);
+    assert.doesNotMatch(container.textContent, /No federated origins yet/);
+  });
+});
+
+describe('aggregation pass failures', () => {
+  test('a toolchange queued behind a failing pass emits its own named failure without overlapping getTools', async () => {
+    setManifestForTests({ rules: [] });
+    seedOriginForTests(ACME, {
+      state: 'active',
+      reason: 'Previously registered origin.',
+      tools: ['acme.booking.search']
+    });
+    let onToolchange;
+    let getToolsCalls = 0;
+    let activeGetToolsCalls = 0;
+    let maxActiveGetToolsCalls = 0;
+    const rejectGetTools = [];
+    let resolveFirstGetToolsStarted;
+    let resolveSecondGetToolsStarted;
+    const firstGetToolsStarted = new Promise((resolve) => {
+      resolveFirstGetToolsStarted = resolve;
+    });
+    const secondGetToolsStarted = new Promise((resolve) => {
+      resolveSecondGetToolsStarted = resolve;
+    });
+    document.modelContext = {
+      addEventListener(type, callback) {
+        if (type === 'toolchange') onToolchange = callback;
+      },
+      removeEventListener() {},
+      getTools() {
+        getToolsCalls += 1;
+        activeGetToolsCalls += 1;
+        maxActiveGetToolsCalls = Math.max(maxActiveGetToolsCalls, activeGetToolsCalls);
+        if (getToolsCalls === 1) resolveFirstGetToolsStarted();
+        if (getToolsCalls === 2) resolveSecondGetToolsStarted();
+
+        return new Promise((resolve, reject) => {
+          rejectGetTools.push((cause) => {
+            activeGetToolsCalls -= 1;
+            reject(cause);
+          });
+        });
+      }
+    };
+
+    const snapshots = [];
+    let resolveFirstUpdate;
+    let resolveSecondUpdate;
+    const firstUpdate = new Promise((resolve) => {
+      resolveFirstUpdate = resolve;
+    });
+    const secondUpdate = new Promise((resolve) => {
+      resolveSecondUpdate = resolve;
+    });
+    const stop = startAggregator((snapshot) => {
+      snapshots.push(snapshot);
+      if (snapshots.length === 1) resolveFirstUpdate();
+      if (snapshots.length === 2) resolveSecondUpdate();
+    });
+
+    await firstGetToolsStarted;
+    onToolchange();
+    await flush();
+    assert.equal(getToolsCalls, 1);
+
+    rejectGetTools[0](new Error('initial getTools exploded'));
+    await firstUpdate;
+    await secondGetToolsStarted;
+    assert.equal(maxActiveGetToolsCalls, 1);
+
+    rejectGetTools[1](new Error('queued getTools exploded'));
+    await secondUpdate;
+    stop();
+
+    assert.equal(snapshots.length, 2);
+    assert.equal(getToolsCalls, 2);
+    assert.equal(maxActiveGetToolsCalls, 1);
+    assert.equal(snapshots.every((snapshot) => snapshot.origins.some((row) => row.origin === ACME)), true);
+    assert.deepEqual(
+      snapshots.map((snapshot) => snapshot.errors.at(-1)),
+      [
+        {
+          origin: '(aggregator)',
+          code: 'AGGREGATION_PASS_FAILED',
+          message: 'initial getTools exploded'
+        },
+        {
+          origin: '(aggregator)',
+          code: 'AGGREGATION_PASS_FAILED',
+          message: 'queued getTools exploded'
+        }
+      ]
+    );
+  });
+
+  test('a queued pass recovers after registerTool fails while the origin is evaluating', async () => {
+    setManifestForTests(MANIFEST);
+    let onToolchange;
+    let rejectFirstRegistration;
+    let resolveFirstRegistrationStarted;
+    const firstRegistrationStarted = new Promise((resolve) => {
+      resolveFirstRegistrationStarted = resolve;
+    });
+    let registrationCalls = 0;
+    const sourceWindow = {};
+    document.modelContext = {
+      addEventListener(type, callback) {
+        if (type === 'toolchange') onToolchange = callback;
+      },
+      removeEventListener() {},
+      async getTools() {
+        return [
+          {
+            origin: ACME,
+            window: sourceWindow,
+            name: 'search',
+            description: 'Search available flights by destination.',
+            inputSchema: JSON.stringify({
+              type: 'object',
+              properties: { query: { type: 'string' } },
+              required: ['query'],
+              additionalProperties: false
+            }),
+            annotations: { readOnlyHint: true }
+          }
+        ];
+      },
+      registerTool() {
+        registrationCalls += 1;
+        if (registrationCalls === 1) {
+          resolveFirstRegistrationStarted();
+          return new Promise((resolve, reject) => {
+            rejectFirstRegistration = reject;
+          });
+        }
+        return Promise.resolve();
+      }
+    };
+
+    const snapshots = [];
+    let resolveSecondSnapshot;
+    const secondSnapshot = new Promise((resolve) => {
+      resolveSecondSnapshot = resolve;
+    });
+    const stop = startAggregator((snapshot) => {
+      snapshots.push(snapshot);
+      if (snapshots.length === 2) resolveSecondSnapshot();
+    });
+
+    await firstRegistrationStarted;
+    onToolchange();
+    rejectFirstRegistration(new Error('transient registration failure'));
+    await secondSnapshot;
+    stop();
+
+    assert.equal(registrationCalls, 2);
+    assert.equal(snapshots[0].errors.at(-1).code, 'AGGREGATION_PASS_FAILED');
+    assert.equal(snapshots[0].origins.find((row) => row.origin === ACME).state, 'degraded');
+    assert.equal(snapshots.at(-1).origins.find((row) => row.origin === ACME).state, 'active');
   });
 });
 
