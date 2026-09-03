@@ -35,25 +35,60 @@ const STATE_MARK = Object.freeze({
 
 const REVOKEABLE = new Set(['active', 'degraded', 'quarantined']);
 
+/**
+ * Presentation only. Every rule keyed on `[data-state]` sets a border tint or
+ * a glyph color that sits BEHIND the shape character and the text label built
+ * in buildOriginRow — it never replaces them. Strip all color from this sheet
+ * and each state is still distinguishable by glyph and by label (R59).
+ * Host tokens are read through `var(--x, fallback)` so the sheet also renders
+ * standalone on a page that defines none of them.
+ */
 const INSPECTOR_CSS = `
 .ambient-inspector { font: inherit; min-width: 0; }
-.inspector-status { margin: 0 0 0.6rem; font-size: 0.9em; }
-.inspector-origins { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.65rem; }
-.inspector-origin { border: 1px solid color-mix(in srgb, currentColor 28%, transparent); border-radius: 6px; padding: 0.6rem 0.7rem; display: grid; gap: 0.3rem; min-width: 0; }
-.inspector-origin:focus { outline: 2px solid currentColor; outline-offset: 2px; }
-.inspector-origin-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.65rem; min-width: 0; }
-.inspector-shape { font-size: 0.95em; }
-.inspector-origin-id { font-weight: 600; overflow-wrap: anywhere; }
-.inspector-state-label { font-weight: 600; }
-.inspector-cause { font-size: 0.9em; }
-.inspector-reason, .inspector-tools, .inspector-flight, .inspector-note { margin: 0; overflow-wrap: anywhere; }
-ul.inspector-tools { padding-left: 1.1rem; }
-.inspector-actions { margin-top: 0.25rem; }
-.inspector-actions button { font: inherit; min-height: 2.25rem; padding: 0.35rem 0.75rem; }
-.inspector-log { margin-top: 0.85rem; }
-.inspector-log h3 { font-size: 0.95em; margin: 0 0 0.35rem; }
-.inspector-log ol { margin: 0; padding-left: 1.2rem; font-size: 0.85em; overflow-wrap: anywhere; }
+.inspector-status { margin: 0 0 0.7rem; font-size: 0.88em; color: var(--text-muted, inherit); overflow-wrap: anywhere; }
+.inspector-status:empty { display: none; }
+.inspector-origins { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.inspector-origin {
+  border: 1px solid var(--line, color-mix(in srgb, currentColor 28%, transparent));
+  border-left: 3px solid var(--inspector-accent, var(--line-strong, color-mix(in srgb, currentColor 40%, transparent)));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface, transparent);
+  box-shadow: var(--shadow-card, none);
+  padding: 0.7rem 0.85rem;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.inspector-origin:focus, .inspector-origin:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+.inspector-origin[data-state="active"] { --inspector-accent: var(--state-active, currentColor); }
+.inspector-origin[data-state="degraded"] { --inspector-accent: var(--state-degraded, currentColor); }
+.inspector-origin[data-state="quarantined"] { --inspector-accent: var(--state-quarantined, currentColor); }
+.inspector-origin[data-state="revoking"] { --inspector-accent: var(--state-revoking, currentColor); }
+.inspector-origin[data-state="revoked"] { --inspector-accent: var(--state-revoked, currentColor); }
+.inspector-origin[data-state="discovering"] { --inspector-accent: var(--state-discovering, currentColor); }
+.inspector-origin[data-state="evaluating"] { --inspector-accent: var(--state-evaluating, currentColor); }
+.inspector-origin-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.6rem; min-width: 0; }
+.inspector-shape { font-size: 0.95em; line-height: 1; color: var(--inspector-accent, currentColor); flex: none; }
+.inspector-origin-id { font-weight: 600; overflow-wrap: anywhere; min-width: 0; letter-spacing: -0.008em; }
+.inspector-state-label { font-weight: 680; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.07em; margin-left: auto; }
+.inspector-cause { font-size: 0.8em; color: var(--text-muted, inherit); background: var(--surface-sunken, transparent); border: 1px solid var(--line, color-mix(in srgb, currentColor 20%, transparent)); border-radius: 999px; padding: 0.08rem 0.55rem; white-space: nowrap; }
+.inspector-reason, .inspector-tools, .inspector-flight, .inspector-note { margin: 0; overflow-wrap: anywhere; font-size: 0.9em; color: var(--text-muted, inherit); }
+.inspector-flight, .inspector-note { font-style: italic; }
+ul.inspector-tools { padding-left: 1.1rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.84em; color: var(--text, inherit); }
+ul.inspector-tools li { margin: 0 0 0.15rem; }
+.inspector-actions { margin-top: 0.3rem; }
+/* Baseline hit target so the control stays >=44px even when this sheet is the
+   only one on the page. The host demo raises specificity (#inspector ...) to
+   restyle it without losing this floor. */
+.inspector-actions button { font: inherit; min-height: 44px; padding: 0.5rem 0.9rem; cursor: pointer; }
+.inspector-empty { color: var(--text-muted, inherit); border: 1px dashed var(--line-strong, color-mix(in srgb, currentColor 30%, transparent)); border-radius: var(--radius-sm, 6px); padding: 0.75rem 0.85rem; }
+.inspector-log { margin-top: 1.1rem; border-top: 1px solid var(--line, color-mix(in srgb, currentColor 15%, transparent)); padding-top: 0.75rem; }
+.inspector-log h3 { font-size: 0.72em; font-weight: 680; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-muted, inherit); margin: 0 0 0.45rem; }
+.inspector-log ol { margin: 0; padding-left: 1.2rem; font-size: 0.82em; line-height: 1.55; color: var(--text-muted, inherit); overflow-wrap: anywhere; }
 .inspector-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 30rem) {
+  .inspector-state-label { margin-left: 0; }
+}
 `;
 
 /** @type {{ at: number, text: string }[]} */
